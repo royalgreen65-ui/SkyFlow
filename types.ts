@@ -46,6 +46,14 @@ export interface LogEntry {
   message: string;
 }
 
+export enum FlightPhase {
+  GROUND = 'Ground Operations',
+  DEPARTURE = 'Departure Phase',
+  ENROUTE = 'En-Route Cruise',
+  APPROACH = 'Approach (Locked)',
+  LANDED = 'Landed'
+}
+
 export enum NavigationTab {
   DASHBOARD = 'Dashboard',
   PLANNER = 'Flight Planner',
