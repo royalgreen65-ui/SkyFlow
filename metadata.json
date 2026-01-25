@@ -1,0 +1,7 @@
+{
+  "name": "SkyFlow: FSX Weather & Flight Planner",
+  "description": "A professional-grade weather simulation and flight planning suite for flight simulators, featuring real-time METAR injection, historical disaster scenarios, and interactive weather radar (XGauge) management.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
