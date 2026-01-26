@@ -60,5 +60,6 @@ export enum NavigationTab {
   BRIEFING = 'Briefing',
   SCENARIOS = 'Historical Scenarios',
   XGAUGE = 'XGauge Config',
+  SETUP = 'Setup Guide',
   SETTINGS = 'System Settings'
 }
