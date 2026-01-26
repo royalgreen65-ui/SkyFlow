@@ -16,7 +16,6 @@ const App: React.FC = () => {
   const [isBridgeActive, setIsBridgeActive] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [autoSync, setAutoSync] = useState(false);
-  const [countdown, setCountdown] = useState(AUTO_SYNC_INTERVAL);
   
   const wsRef = useRef<WebSocket | null>(null);
   
@@ -83,7 +82,7 @@ const App: React.FC = () => {
       <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-8 shadow-2xl z-30">
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 bg-sky-600 rounded-xl flex items-center justify-center font-black italic shadow-lg shadow-sky-600/20">S</div>
-          <span className="font-black text-2xl tracking-tighter italic uppercase">SkyFlow <span className="text-sky-500 not-italic tracking-normal text-sm">v2.0</span></span>
+          <span className="font-black text-2xl tracking-tighter italic uppercase">SkyFlow <span className="text-sky-500 not-italic tracking-normal text-sm">v2.2</span></span>
         </div>
 
         <div className="flex gap-4">
@@ -131,19 +130,19 @@ const App: React.FC = () => {
               {!isBridgeActive && (
                 <div className="bg-red-500/10 border-2 border-red-500/50 p-10 rounded-[40px] flex flex-col gap-6 animate-pulse">
                   <div className="flex items-center gap-6">
-                    <div className="text-6xl">🛑</div>
+                    <div className="text-6xl">🛠️</div>
                     <div>
-                      <h2 className="text-3xl font-black uppercase text-white tracking-tight">Engine Not Found</h2>
-                      <p className="text-red-200 opacity-70">The background bridge is not communicating.</p>
+                      <h2 className="text-3xl font-black uppercase text-white tracking-tight">System Initialization Required</h2>
+                      <p className="text-red-200 opacity-70">The background weather engine is not running.</p>
                     </div>
                   </div>
                   <div className="bg-red-950/40 p-6 rounded-2xl border border-red-500/20 text-sm leading-relaxed text-red-100">
-                    <p className="font-bold mb-2">HOW TO FIX THIS:</p>
-                    <ol className="list-decimal pl-6 space-y-1">
-                      <li>Go to the folder where you extracted SkyFlow.</li>
-                      <li>Double-click <code className="bg-red-500 text-white px-2 rounded">LAUNCH_SKYFLOW.bat</code>.</li>
-                      <li>Wait for the black window to say "READY".</li>
-                      <li>Keep that window open while you fly!</li>
+                    <p className="font-bold mb-4">TO START THE ENGINE:</p>
+                    <ol className="list-decimal pl-6 space-y-3">
+                      <li>Open the folder where you unzipped SkyFlow.</li>
+                      <li>Double-click <code className="bg-red-500 text-white px-2 rounded font-bold">LAUNCH_SKYFLOW.bat</code>.</li>
+                      <li>A black window will open. **Leave it open** while you play.</li>
+                      <li>If Windows asks "What program to use?", restart your computer and try again.</li>
                     </ol>
                   </div>
                 </div>
@@ -167,26 +166,11 @@ const App: React.FC = () => {
                     <button 
                       onClick={() => handleInject()}
                       disabled={loading || !isBridgeActive}
-                      className={`px-12 py-6 rounded-3xl font-black uppercase tracking-widest transition-all ${loading || !isBridgeActive ? 'bg-slate-800 text-slate-600 grayscale' : 'bg-sky-600 hover:bg-sky-500 text-white shadow-2xl shadow-sky-900/50 active:scale-95'}`}
+                      className={`px-12 py-6 rounded-3xl font-black uppercase tracking-widest transition-all ${loading || !isBridgeActive ? 'bg-slate-800 text-slate-600 grayscale cursor-not-allowed' : 'bg-sky-600 hover:bg-sky-500 text-white shadow-2xl shadow-sky-900/50 active:scale-95'}`}
                     >
-                      {loading ? 'Thinking...' : 'Sync Now'}
+                      {loading ? 'Processing...' : 'Inject METAR'}
                     </button>
                   </div>
-                </div>
-                
-                <div className="pt-10 border-t border-slate-800 flex items-center justify-between">
-                   <div className="flex items-center gap-4">
-                      <button 
-                        onClick={() => setAutoSync(!autoSync)}
-                        className={`relative w-16 h-8 rounded-full transition-all ${autoSync ? 'bg-sky-500 shadow-lg shadow-sky-500/20' : 'bg-slate-700'}`}
-                      >
-                         <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all ${autoSync ? 'left-9' : 'left-1'}`} />
-                      </button>
-                      <div>
-                        <p className="font-black uppercase text-xs text-white">Automated Sync</p>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase">Updates every 10 mins</p>
-                      </div>
-                   </div>
                 </div>
               </div>
 
@@ -206,30 +190,30 @@ const App: React.FC = () => {
           {activeTab === NavigationTab.SETUP && (
             <div className="max-w-3xl mx-auto py-12 space-y-12">
               <div className="text-center">
-                 <h1 className="text-6xl font-black uppercase tracking-tighter">Perfect Setup</h1>
-                 <p className="text-slate-400 mt-4 text-xl">Follow these 3 steps exactly.</p>
+                 <h1 className="text-6xl font-black uppercase tracking-tighter">Getting Started</h1>
+                 <p className="text-slate-400 mt-4 text-xl">Avoid common mistakes for a smooth flight.</p>
               </div>
 
               <div className="space-y-4">
-                <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 flex gap-8 group hover:border-sky-500/50 transition-all">
+                <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 flex gap-8">
                    <div className="w-16 h-16 bg-sky-600 rounded-2xl flex items-center justify-center text-2xl font-black shrink-0">1</div>
                    <div className="space-y-2">
-                      <h4 className="text-xl font-black uppercase">The "Extract" Rule</h4>
-                      <p className="text-slate-400 leading-relaxed text-sm">Right-click the zip, Extract All, and open the new folder. <strong>Never</strong> run from the zip window.</p>
+                      <h4 className="text-xl font-black uppercase">Install Node.js</h4>
+                      <p className="text-slate-400 leading-relaxed text-sm">Download the **LTS** version from nodejs.org. This is required to run the server logic.</p>
                    </div>
                 </div>
-                <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 flex gap-8 group hover:border-sky-500/50 transition-all">
+                <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 flex gap-8">
                    <div className="w-16 h-16 bg-sky-600 rounded-2xl flex items-center justify-center text-2xl font-black shrink-0">2</div>
                    <div className="space-y-2">
-                      <h4 className="text-xl font-black uppercase">Node.js Engine</h4>
-                      <p className="text-slate-400 leading-relaxed text-sm">Download "LTS" from nodejs.org and install it. This is the electricity for the engine.</p>
+                      <h4 className="text-xl font-black uppercase">Run the Batch File</h4>
+                      <p className="text-slate-400 leading-relaxed text-sm">Always use <code className="text-sky-400">LAUNCH_SKYFLOW.bat</code>. Do not try to open the .js files manually.</p>
                    </div>
                 </div>
-                <div className="bg-sky-600 p-8 rounded-3xl flex gap-8 shadow-2xl shadow-sky-900/40 translate-x-4">
-                   <div className="w-16 h-16 bg-white text-sky-600 rounded-2xl flex items-center justify-center text-2xl font-black shrink-0">3</div>
+                <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 flex gap-8">
+                   <div className="w-16 h-16 bg-sky-600 rounded-2xl flex items-center justify-center text-2xl font-black shrink-0">3</div>
                    <div className="space-y-2">
-                      <h4 className="text-xl font-black uppercase text-white italic underline">Launch Skyflow</h4>
-                      <p className="text-sky-100 leading-relaxed text-sm font-bold">Inside your folder, double-click "LAUNCH_SKYFLOW.bat". It will install everything and open the dashboard for you.</p>
+                      <h4 className="text-xl font-black uppercase">Check the Cockpit</h4>
+                      <p className="text-slate-400 leading-relaxed text-sm">Make sure you have loaded into the game world. The connection will only turn green once you are sitting in the aircraft.</p>
                    </div>
                 </div>
               </div>
@@ -238,15 +222,15 @@ const App: React.FC = () => {
 
           {activeTab === NavigationTab.SETTINGS && (
             <div className="max-w-2xl mx-auto py-12 space-y-8">
-               <h2 className="text-4xl font-black uppercase text-center">Troubleshooter</h2>
+               <h2 className="text-4xl font-black uppercase text-center italic">Troubleshooting Wizard</h2>
                <div className="space-y-4">
-                  <div className="bg-red-500/10 border border-red-500/30 p-8 rounded-3xl">
-                     <h5 className="text-red-400 font-black uppercase text-xs mb-2">The Black Window closes immediately?</h5>
-                     <p className="text-sm text-slate-300">This means Node.js is not installed correctly or you are still inside the ZIP file. Double check Step 1 and 2 in the Setup guide.</p>
+                  <div className="bg-amber-500/10 border border-amber-500/30 p-8 rounded-3xl">
+                     <h5 className="text-amber-400 font-black uppercase text-xs mb-2">"Open With..." Dialog appears?</h5>
+                     <p className="text-sm text-slate-300 leading-relaxed">This means your Batch file is failing to find Node.js. Try moving the folder to <code className="bg-slate-800 px-1 rounded">C:\SkyFlow</code> and run the launcher again as Administrator.</p>
                   </div>
                   <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl">
-                     <h5 className="text-sky-400 font-black uppercase text-xs mb-2">"Sim not found" even with game open?</h5>
-                     <p className="text-sm text-slate-400">Make sure you are at the airport and sitting in the cockpit. SimConnect doesn't link until the world is finished loading.</p>
+                     <h5 className="text-sky-400 font-black uppercase text-xs mb-2">SimConnect Drivers?</h5>
+                     <p className="text-sm text-slate-400 leading-relaxed">If the engine is green but the Sim is waiting, ensure you have the SimConnect SDK installed. This usually comes with FSX/P3D but might need a manual install on some Windows versions.</p>
                   </div>
                </div>
             </div>
