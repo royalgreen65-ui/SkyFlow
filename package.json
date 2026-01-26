@@ -1,12 +1,14 @@
 
 {
   "name": "skyflow-bridge",
-  "version": "1.0.0",
-  "description": "Bridge between SkyFlow Web UI and FSX SimConnect",
+  "version": "1.3.0",
+  "description": "Simple Bridge and UI Server for FSX/P3D Weather",
   "main": "bridge.js",
   "dependencies": {
     "ws": "^8.13.0",
-    "node-simconnect": "^0.0.5"
+    "node-simconnect": "^0.0.5",
+    "node-notifier": "^10.0.1",
+    "express": "^4.18.2"
   },
   "scripts": {
     "start": "node bridge.js"

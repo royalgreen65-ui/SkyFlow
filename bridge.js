@@ -1,34 +1,64 @@
 
 /**
- * SKYFLOW BRIDGE CLI v1.1.0
- * Connects the SkyFlow Web Dashboard to FSX/P3D via SimConnect.
+ * SKYFLOW BRIDGE & UI SERVER
+ * Handles weather injection and system notifications.
  */
 
 const WebSocket = require('ws');
 const { SimConnect } = require('node-simconnect');
+const notifier = require('node-notifier');
+const express = require('express');
+const path = require('path');
+const { exec } = require('child_process');
 
-console.log('===========================================');
-console.log('SKYFLOW WEATHER BRIDGE - v1.1.0');
-console.log('WINDOWS FSX/P3D INTERFACE');
-console.log('===========================================');
+console.clear();
+console.log('======================================================');
+console.log('            🚀 SKYFLOW FLIGHT BRIDGE 🚀              ');
+console.log('======================================================');
+console.log('');
+console.log('[TIP] Keep this window open for "Automated Updates" to work.');
 console.log('');
 
+// --- 1. START THE WEB SERVER ---
+const app = express();
+const UI_PORT = 3000;
+
+app.use(express.static(__dirname));
+
+app.listen(UI_PORT, () => {
+  console.log(`[STATUS] ✅ Dashboard is ready at http://localhost:${UI_PORT}`);
+  
+  const url = `http://localhost:${UI_PORT}`;
+  const start = (process.platform == 'darwin' ? 'open' : process.platform == 'win32' ? 'start' : 'xdg-open');
+  exec(`${start} ${url}`);
+});
+
+// --- 2. THE SIMULATOR LINK ---
 const wss = new WebSocket.Server({ port: 8080 });
 let simConnected = false;
 let sc = null;
 
+function notifyUser(title, message) {
+  notifier.notify({
+    title: title,
+    message: message,
+    appID: "SkyFlow Engine",
+    sound: true, 
+    wait: false
+  });
+}
+
 async function connectToSim() {
   try {
     if (sc) await sc.close();
-    
-    console.log('[SimConnect] Locating Simulator process...');
     sc = new SimConnect();
     await sc.open('SkyFlow Bridge');
     simConnected = true;
-    console.log('[SimConnect] SUCCESS: Connected to FSX/P3D.');
+    console.log('[STATUS] ✈️  LINKED TO FLIGHT SIMULATOR!');
+    notifyUser("SkyFlow Connected!", "Link established. Automated sync is now available.");
     broadcastStatus();
   } catch (err) {
-    console.error('[SimConnect] ERROR: Simulator not detected. Ensure FSX is running.');
+    console.log('[STATUS] 😴 Waiting for game... (Retrying in 5s)');
     simConnected = false;
     broadcastStatus();
   }
@@ -37,50 +67,44 @@ async function connectToSim() {
 function broadcastStatus() {
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify({ 
-        type: 'STATUS', 
-        connected: simConnected 
-      }));
+      client.send(JSON.stringify({ type: 'STATUS', connected: simConnected }));
     }
   });
 }
 
-// Auto-connect on startup
+setInterval(() => {
+  if (!simConnected) connectToSim();
+}, 5000);
+
 connectToSim();
 
 wss.on('connection', (ws) => {
-  console.log('[Bridge] Dashboard linked via WebSocket.');
+  console.log('[BRIDGE] 🔗 Connection established with Browser Dashboard.');
   broadcastStatus();
 
   ws.on('message', async (message) => {
     try {
       const data = JSON.parse(message);
-      
-      if (data.type === 'CONNECT_SIM') {
-        await connectToSim();
-      }
-
+      if (data.type === 'CONNECT_SIM') await connectToSim();
       if (data.type === 'INJECT_WEATHER') {
-        console.log(`[Injection] Station: ${data.icao} | METAR: ${data.raw}`);
-        
         if (simConnected && sc) {
-          // Injection into the global weather engine
           sc.weatherSetObservation(0, data.raw);
-          console.log(`[FSX] Injection Successful.`);
+          const mode = data.isAuto ? "(AUTO)" : "(MANUAL)";
+          console.log(`[ACTION] 🌦️  Weather Sync ${mode} -> ${data.icao}`);
+          
+          notifyUser(
+            data.isAuto ? "Auto-Sync Successful" : "Weather Injected!",
+            `Sim skies updated for ${data.icao}. Next check in 10 mins.`
+          );
         } else {
-          console.warn('[FSX] Injection failed: Sim not connected.');
-          await connectToSim(); // Try to reconnect
+          console.log('[ERROR] ❌ Injection failed: Simulator closed.');
         }
       }
     } catch (e) {
-      console.error('[Bridge] Communication Error.');
+      console.error('[ERROR] Communication error between dashboard and bridge.');
     }
-  });
-
-  ws.on('close', () => {
-    console.log('[Bridge] Dashboard disconnected.');
   });
 });
 
-console.log('[Bridge] Waiting for Dashboard connection on ws://localhost:8080');
-console.log('[Bridge] Press Ctrl+C to stop.');
+console.log('------------------------------------------------------');
+console.log('READY! Minimize this window and enjoy your flight.');
