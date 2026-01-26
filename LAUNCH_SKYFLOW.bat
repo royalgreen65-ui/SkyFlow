@@ -1,97 +1,78 @@
 @echo off
 setlocal enabledelayedexpansion
-title SkyFlow Professional Launcher
+title SkyFlow Professional Weather Engine
 color 0F
 
+:: --- 1. SETTINGS ---
+set "APP_DIR=%~dp0"
+set "NODE_EXE=node"
+set "BRIDGE_JS=%~dp0bridge.js"
+
 echo ======================================================
-echo           SKYFLOW WEATHER ENGINE (v2.2)
+echo           SKYFLOW WEATHER ENGINE (v2.3)
 echo ======================================================
 echo.
 
-:: --- 1. ZIP DETECTION ---
-set "CURRENT_DIR=%~dp0"
-echo %CURRENT_DIR% | findstr /I "Temp 7z Rar Zip" >nul
+:: --- 2. ZIP PROTECTION ---
+echo %APP_DIR% | findstr /I "Temp 7z Rar Zip" >nul
 if %errorlevel% equ 0 (
     color 0C
-    echo [ERROR] RUNNING FROM ZIP.
+    echo [ERROR] DO NOT RUN FROM ZIP!
     echo.
-    echo PLEASE: 
-    echo 1. Right-Click 'SkyFlow.zip' -> 'Extract All'
-    echo 2. Run THIS file from the NEW folder.
+    echo 1. Right-Click 'SkyFlow.zip'
+    echo 2. Choose 'Extract All'
+    echo 3. Run THIS file from the new folder.
     pause
     exit /b
 )
 
-:: --- 2. NODE.JS PATH FINDER ---
-echo [SYSTEM] Locating Node.js Engine...
+:: --- 3. NODE.JS DETECTION ---
+echo [1/3] Locating Engine...
 where node >nul 2>&1
 if %errorlevel% neq 0 (
-    color 0E
-    echo [!] Node.js not found in System Path.
-    echo Checking common install locations...
-    
     if exist "C:\Program Files\nodejs\node.exe" (
         set "NODE_EXE=C:\Program Files\nodejs\node.exe"
-        set "NPM_EXE=C:\Program Files\nodejs\npm.cmd"
     ) else (
-        echo [ERROR] Node.js is NOT installed.
+        color 0E
+        echo [!] Node.js is missing. 
+        echo Opening installer...
         start https://nodejs.org/en/download/prebuilt-installer
-        echo.
-        echo Please install Node.js, REBOOT, and try again.
+        echo Install the 'LTS' version, then run this file again.
         pause
         exit /b
     )
-) else (
-    for /f "delims=" %%i in ('where node') do set "NODE_EXE=%%i"
-    for /f "delims=" %%i in ('where npm') do set "NPM_EXE=%%i"
 )
 
-echo [OK] Found Engine: %NODE_EXE%
-
-:: --- 3. AUTO-INSTALL ---
-if not exist "node_modules\" (
-    echo [SYSTEM] First-time setup: Building components...
-    echo Please wait while we prepare the weather engine...
-    call "%NPM_EXE%" install --quiet --no-audit --no-fund
+:: --- 4. AUTO-INSTALL ---
+if not exist "%~dp0node_modules\" (
+    echo [2/3] Preparing components (First-time only)...
+    cd /d "%~dp0"
+    call npm install --quiet --no-audit --no-fund
     if %errorlevel% neq 0 (
         color 0C
-        echo [ERROR] Component build failed. 
-        echo Check your internet or move the folder out of OneDrive/Desktop.
+        echo [ERROR] Installation failed. Move this folder to C:\SkyFlow and try again.
         pause
         exit /b
     )
 )
 
-:: --- 4. SHORTCUT CREATOR ---
-if not exist "%USERPROFILE%\Desktop\SkyFlow Engine.lnk" (
-    echo [SYSTEM] Creating Desktop Shortcut...
-    set SCRIPT="%TEMP%\SkyFlowShortCut.vbs"
-    echo Set oWS = WScript.CreateObject("WScript.Shell") > %SCRIPT%
-    echo sLinkFile = oWS.SpecialFolders("Desktop") ^& "\SkyFlow Engine.lnk" >> %SCRIPT%
-    echo Set oLink = oWS.CreateShortcut(sLinkFile) >> %SCRIPT%
-    echo oLink.TargetPath = "%~f0" >> %SCRIPT%
-    echo oLink.WorkingDirectory = "%~dp0" >> %SCRIPT%
-    echo oLink.IconLocation = "shell32.dll, 238" >> %SCRIPT%
-    echo oLink.Save >> %SCRIPT%
-    cscript /nologo %SCRIPT%
-    del %SCRIPT%
-)
-
-:: --- 5. EXECUTION ---
-echo [SYSTEM] Launching SkyFlow Server...
+:: --- 5. THE MAGIC LAUNCH ---
+echo [3/3] Igniting Engine...
+echo.
+echo ------------------------------------------------------
+echo DASHBOARD: http://localhost:3000
 echo ------------------------------------------------------
 echo.
-:: Using the absolute path to node.exe ensures Windows doesn't ask "what program"
-"%NODE_EXE%" bridge.js
+
+:: We use the absolute path to node and the absolute path to bridge.js
+:: This PREVENTS Windows from opening VS Code or Notepad.
+start http://localhost:3000
+"%NODE_EXE%" "%BRIDGE_JS%"
+
 if %errorlevel% neq 0 (
     echo.
-    echo ------------------------------------------------------
     color 0C
-    echo [CRITICAL ERROR] The Engine crashed.
-    echo.
-    echo TRY THIS: 
-    echo 1. Move this folder to C:\SkyFlow
-    echo 2. Run this launcher again.
-    echo.
+    echo [CRITICAL] The engine stopped unexpectedly.
+    echo Make sure you didn't move any files out of the folder!
     pause
 )

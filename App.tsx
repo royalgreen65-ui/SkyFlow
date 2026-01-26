@@ -5,8 +5,6 @@ import { fetchMetarData } from './services/geminiService';
 import { MetarDisplay } from './components/MetarDisplay';
 import { RadarView } from './components/RadarView';
 
-const AUTO_SYNC_INTERVAL = 600;
-
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavigationTab>(NavigationTab.DASHBOARD);
   const [loading, setLoading] = useState(false);
@@ -15,7 +13,6 @@ const App: React.FC = () => {
   const [isSimConnected, setIsSimConnected] = useState(false);
   const [isBridgeActive, setIsBridgeActive] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [autoSync, setAutoSync] = useState(false);
   
   const wsRef = useRef<WebSocket | null>(null);
   
@@ -34,7 +31,7 @@ const App: React.FC = () => {
       const ws = new WebSocket('ws://localhost:8080');
       ws.onopen = () => {
         setIsBridgeActive(true);
-        addLog("Engine Link Established", "SUCCESS");
+        addLog("Engine Link established", "SUCCESS");
       };
       ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
@@ -45,7 +42,7 @@ const App: React.FC = () => {
       ws.onclose = () => {
         setIsBridgeActive(false);
         setIsSimConnected(false);
-        setTimeout(connectBridge, 3000);
+        setTimeout(connectBridge, 2000);
       };
       wsRef.current = ws;
     };
@@ -53,9 +50,9 @@ const App: React.FC = () => {
     return () => wsRef.current?.close();
   }, []);
 
-  const handleInject = async (isAuto = false) => {
+  const handleInject = async () => {
     if (!stationQuery || stationQuery.length < 3) return;
-    if (!isAuto) setLoading(true);
+    setLoading(true);
     
     try {
       const data = await fetchMetarData(stationQuery);
@@ -64,175 +61,154 @@ const App: React.FC = () => {
         wsRef.current.send(JSON.stringify({
           type: 'INJECT_WEATHER',
           icao: data.icao,
-          raw: data.raw,
-          isAuto: isAuto
+          raw: data.raw
         }));
-        addLog(`Injected ${data.icao}`, 'SUCCESS');
+        addLog(`Successfully injected ${data.icao} into Sim`, 'SUCCESS');
       }
     } catch (error) {
       addLog(`Failed to fetch ${stationQuery}`, 'ERROR');
     } finally {
-      if (!isAuto) setLoading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col h-screen bg-slate-950 text-slate-100 font-sans overflow-hidden">
-      {/* Header */}
-      <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-8 shadow-2xl z-30">
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 bg-sky-600 rounded-xl flex items-center justify-center font-black italic shadow-lg shadow-sky-600/20">S</div>
-          <span className="font-black text-2xl tracking-tighter italic uppercase">SkyFlow <span className="text-sky-500 not-italic tracking-normal text-sm">v2.2</span></span>
+    <div className="flex flex-col h-screen bg-[#05070a] text-slate-100 font-sans overflow-hidden">
+      {/* Dynamic Status Header */}
+      <header className="h-20 bg-slate-900/50 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-10">
+        <div className="flex items-center gap-6">
+          <div className="w-12 h-12 bg-sky-600 rounded-2xl flex items-center justify-center text-2xl font-black italic shadow-2xl shadow-sky-600/30">S</div>
+          <div>
+            <h1 className="text-2xl font-black uppercase tracking-tighter leading-none">SkyFlow</h1>
+            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Professional Weather Engine v2.3</p>
+          </div>
         </div>
 
-        <div className="flex gap-4">
-           <div className={`px-4 py-2 rounded-full border text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${isBridgeActive ? 'bg-sky-500/10 border-sky-500/50 text-sky-400' : 'bg-red-500/10 border-red-500/50 text-red-400'}`}>
-              <div className={`w-2 h-2 rounded-full ${isBridgeActive ? 'bg-sky-400 animate-pulse' : 'bg-red-500'}`} />
-              {isBridgeActive ? 'Engine: Linked' : 'Engine: Offline'}
+        <div className="flex gap-6">
+           <div className={`px-5 py-3 rounded-2xl border flex items-center gap-3 transition-all duration-500 ${isBridgeActive ? 'bg-sky-500/10 border-sky-500/30 text-sky-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+              <div className={`w-3 h-3 rounded-full ${isBridgeActive ? 'bg-sky-400 animate-ping' : 'bg-red-500'}`} />
+              <span className="text-xs font-black uppercase tracking-widest">{isBridgeActive ? 'Engine: Linked' : 'Engine: Offline'}</span>
            </div>
-           <div className={`px-4 py-2 rounded-full border text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${isSimConnected ? 'bg-green-500/10 border-green-500/50 text-green-400' : 'bg-slate-800 border-slate-700 text-slate-500'}`}>
-              <div className={`w-2 h-2 rounded-full ${isSimConnected ? 'bg-green-400 animate-pulse' : 'bg-slate-600'}`} />
-              {isSimConnected ? 'Sim: Active' : 'Sim: Waiting...'}
+           <div className={`px-5 py-3 rounded-2xl border flex items-center gap-3 transition-all duration-500 ${isSimConnected ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-slate-800 border-slate-700 text-slate-500'}`}>
+              <div className={`w-3 h-3 rounded-full ${isSimConnected ? 'bg-green-400 animate-pulse' : 'bg-slate-600'}`} />
+              <span className="text-xs font-black uppercase tracking-widest">{isSimConnected ? 'Sim: Connected' : 'Sim: Searching...'}</span>
            </div>
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Navigation */}
-        <nav className="w-72 bg-slate-900 border-r border-slate-800 p-8 flex flex-col gap-3">
+        {/* Navigation Sidebar */}
+        <nav className="w-80 bg-[#0a0f17] border-r border-slate-800 p-8 flex flex-col gap-3">
           {[NavigationTab.DASHBOARD, NavigationTab.SETUP, NavigationTab.SETTINGS].map(tab => (
             <button 
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`w-full text-left p-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-sky-600 text-white shadow-xl shadow-sky-900/40 translate-x-1' : 'text-slate-500 hover:bg-slate-800 hover:text-slate-300'}`}
+              className={`w-full text-left p-5 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-sky-600 text-white shadow-2xl shadow-sky-900/40 translate-x-1' : 'text-slate-500 hover:bg-slate-800/50 hover:text-slate-300'}`}
             >
-              {tab === NavigationTab.DASHBOARD ? '🚀 Control Panel' : tab === NavigationTab.SETUP ? '📖 Setup Guide' : '🔧 Troubleshooting'}
+              {tab === NavigationTab.DASHBOARD ? '🎮 Cockpit Controls' : tab === NavigationTab.SETUP ? '📖 Manual & Setup' : '🔧 Troubleshooting'}
             </button>
           ))}
           
-          <div className="mt-auto border-t border-slate-800 pt-6">
-            <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 font-mono text-[10px] max-h-40 overflow-y-auto space-y-1">
-              <p className="text-slate-600 font-bold mb-2 uppercase">Log Feed</p>
+          <div className="mt-auto">
+            <div className="p-5 bg-black/40 rounded-3xl border border-slate-800 font-mono text-[10px] h-56 overflow-y-auto space-y-2">
+              <p className="text-slate-600 font-black mb-2 border-b border-slate-800 pb-2 uppercase tracking-tighter">Live System Logs</p>
               {logs.map(log => (
-                <div key={log.id} className={log.level === 'SUCCESS' ? 'text-green-400' : log.level === 'ERROR' ? 'text-red-400' : 'text-sky-400'}>
+                <div key={log.id} className={`${log.level === 'SUCCESS' ? 'text-green-400' : log.level === 'ERROR' ? 'text-red-400' : 'text-sky-400'} opacity-80`}>
                   [{log.timestamp}] {log.message}
                 </div>
               ))}
+              {logs.length === 0 && <div className="text-slate-800 italic">No logs recorded yet...</div>}
             </div>
           </div>
         </nav>
 
-        {/* Main Content */}
-        <main className="flex-1 bg-slate-950 overflow-y-auto p-12">
+        {/* Main Interface */}
+        <main className="flex-1 bg-gradient-to-br from-[#05070a] to-[#0a0f17] overflow-y-auto p-12">
           {activeTab === NavigationTab.DASHBOARD && (
-            <div className="max-w-5xl mx-auto space-y-12">
+            <div className="max-w-6xl mx-auto space-y-12">
               
               {!isBridgeActive && (
-                <div className="bg-red-500/10 border-2 border-red-500/50 p-10 rounded-[40px] flex flex-col gap-6 animate-pulse">
-                  <div className="flex items-center gap-6">
-                    <div className="text-6xl">🛠️</div>
-                    <div>
-                      <h2 className="text-3xl font-black uppercase text-white tracking-tight">System Initialization Required</h2>
-                      <p className="text-red-200 opacity-70">The background weather engine is not running.</p>
+                <div className="bg-red-500/5 border border-red-500/20 p-12 rounded-[50px] flex items-center gap-10 animate-in fade-in slide-in-from-top-4 duration-700">
+                  <div className="text-7xl">🛠️</div>
+                  <div>
+                    <h2 className="text-3xl font-black uppercase tracking-tighter text-white">Critical: Engine Offline</h2>
+                    <p className="text-slate-400 text-lg mt-2 mb-6">You must run the background server to inject weather into your game.</p>
+                    <div className="bg-black/40 p-6 rounded-3xl border border-red-500/10 text-xs font-mono text-red-200/60 leading-relaxed">
+                      1. Locate your SkyFlow folder.<br/>
+                      2. Double-click <span className="text-red-400 font-bold underline">LAUNCH_SKYFLOW.bat</span>.<br/>
+                      3. DO NOT click the .js files (they open in Notepad/VS Code).
                     </div>
-                  </div>
-                  <div className="bg-red-950/40 p-6 rounded-2xl border border-red-500/20 text-sm leading-relaxed text-red-100">
-                    <p className="font-bold mb-4">TO START THE ENGINE:</p>
-                    <ol className="list-decimal pl-6 space-y-3">
-                      <li>Open the folder where you unzipped SkyFlow.</li>
-                      <li>Double-click <code className="bg-red-500 text-white px-2 rounded font-bold">LAUNCH_SKYFLOW.bat</code>.</li>
-                      <li>A black window will open. **Leave it open** while you play.</li>
-                      <li>If Windows asks "What program to use?", restart your computer and try again.</li>
-                    </ol>
                   </div>
                 </div>
               )}
 
-              <div className="bg-slate-900 p-12 rounded-[50px] border border-slate-800 shadow-2xl space-y-10">
-                <div className="flex flex-col lg:flex-row items-center gap-12">
+              <div className="bg-[#0f172a] p-12 rounded-[60px] border border-slate-800/50 shadow-3xl space-y-10 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-96 h-96 bg-sky-600/5 blur-[120px] rounded-full pointer-events-none group-hover:bg-sky-600/10 transition-all duration-1000" />
+                
+                <div className="flex flex-col lg:flex-row items-center gap-16 relative z-10">
                   <div className="flex-1">
-                    <h1 className="text-4xl font-black uppercase tracking-tighter text-white">Weather Injector</h1>
-                    <p className="text-slate-500 text-lg mt-2">Update your simulator skies in real-time.</p>
+                    <h2 className="text-5xl font-black uppercase tracking-tighter text-white leading-none">Weather<br/><span className="text-sky-500 italic">Injection</span></h2>
+                    <p className="text-slate-500 text-xl mt-4 max-w-md">Fetch high-fidelity METAR data and force it into your flight simulator instantly.</p>
                   </div>
-                  <div className="flex gap-4 w-full lg:w-auto">
-                    <input 
-                      type="text" 
-                      maxLength={4}
-                      value={stationQuery}
-                      onChange={e => setStationQuery(e.target.value.toUpperCase())}
-                      className="flex-1 lg:w-48 bg-slate-950 border-2 border-slate-800 rounded-3xl p-6 text-3xl font-black text-center outline-none focus:border-sky-500 transition-all text-white placeholder:text-slate-800"
-                      placeholder="ICAO"
-                    />
-                    <button 
-                      onClick={() => handleInject()}
-                      disabled={loading || !isBridgeActive}
-                      className={`px-12 py-6 rounded-3xl font-black uppercase tracking-widest transition-all ${loading || !isBridgeActive ? 'bg-slate-800 text-slate-600 grayscale cursor-not-allowed' : 'bg-sky-600 hover:bg-sky-500 text-white shadow-2xl shadow-sky-900/50 active:scale-95'}`}
-                    >
-                      {loading ? 'Processing...' : 'Inject METAR'}
-                    </button>
+                  <div className="flex flex-col gap-4 w-full lg:w-auto">
+                    <div className="flex gap-4">
+                      <input 
+                        type="text" 
+                        maxLength={4}
+                        value={stationQuery}
+                        onChange={e => setStationQuery(e.target.value.toUpperCase())}
+                        className="w-40 lg:w-56 bg-black/60 border-2 border-slate-800 rounded-3xl p-8 text-4xl font-black text-center outline-none focus:border-sky-500 transition-all text-white placeholder:text-slate-800 shadow-inner"
+                        placeholder="ICAO"
+                      />
+                      <button 
+                        onClick={() => handleInject()}
+                        disabled={loading || !isBridgeActive}
+                        className={`px-16 py-8 rounded-3xl font-black uppercase tracking-[0.2em] text-xs transition-all ${loading || !isBridgeActive ? 'bg-slate-800 text-slate-600 cursor-not-allowed opacity-50' : 'bg-sky-600 hover:bg-sky-500 text-white shadow-2xl shadow-sky-900/40 active:scale-95'}`}
+                      >
+                        {loading ? 'Processing...' : 'SYNC TO SIM'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-12">
                  <div className="space-y-6">
-                    <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-600 pl-4">Digital Metar Readout</h3>
-                    {currentMetar ? <MetarDisplay data={currentMetar} /> : <div className="h-64 border-2 border-dashed border-slate-800 rounded-[40px] flex items-center justify-center text-slate-800 font-black italic uppercase tracking-widest">Waiting for data...</div>}
+                    <h3 className="text-[11px] font-black uppercase tracking-[0.5em] text-slate-700 pl-4">Digital Telemetry</h3>
+                    {currentMetar ? <MetarDisplay data={currentMetar} /> : <div className="h-72 border-2 border-dashed border-slate-900 rounded-[50px] flex items-center justify-center text-slate-800 font-black italic uppercase tracking-widest">Waiting for Data...</div>}
                  </div>
                  <div className="space-y-6">
-                    <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-600 pl-4">X-Gauge Weather Radar</h3>
-                    {currentMetar ? <RadarView metar={currentMetar} /> : <div className="h-64 border-2 border-dashed border-slate-800 rounded-[40px] flex items-center justify-center text-slate-800 font-black italic uppercase tracking-widest">Radar Offline</div>}
+                    <h3 className="text-[11px] font-black uppercase tracking-[0.5em] text-slate-700 pl-4">X-Gauge Weather Radar</h3>
+                    {currentMetar ? <RadarView metar={currentMetar} /> : <div className="h-72 border-2 border-dashed border-slate-900 rounded-[50px] flex items-center justify-center text-slate-800 font-black italic uppercase tracking-widest">Radar Standby</div>}
                  </div>
               </div>
             </div>
           )}
 
           {activeTab === NavigationTab.SETUP && (
-            <div className="max-w-3xl mx-auto py-12 space-y-12">
-              <div className="text-center">
-                 <h1 className="text-6xl font-black uppercase tracking-tighter">Getting Started</h1>
-                 <p className="text-slate-400 mt-4 text-xl">Avoid common mistakes for a smooth flight.</p>
+            <div className="max-w-4xl mx-auto py-12 space-y-12">
+              <div className="text-center space-y-4">
+                 <h1 className="text-7xl font-black uppercase tracking-tighter italic">One-Click Setup</h1>
+                 <p className="text-slate-500 text-2xl">Follow these 3 steps to unlock professional weather.</p>
               </div>
 
-              <div className="space-y-4">
-                <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 flex gap-8">
-                   <div className="w-16 h-16 bg-sky-600 rounded-2xl flex items-center justify-center text-2xl font-black shrink-0">1</div>
-                   <div className="space-y-2">
-                      <h4 className="text-xl font-black uppercase">Install Node.js</h4>
-                      <p className="text-slate-400 leading-relaxed text-sm">Download the **LTS** version from nodejs.org. This is required to run the server logic.</p>
-                   </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="bg-slate-900/40 p-10 rounded-[40px] border border-slate-800 space-y-6 hover:border-sky-500/50 transition-all group">
+                   <div className="w-16 h-16 bg-sky-600 rounded-3xl flex items-center justify-center text-2xl font-black group-hover:scale-110 transition-transform">1</div>
+                   <h4 className="text-xl font-black uppercase tracking-tight">Extract ZIP</h4>
+                   <p className="text-slate-500 text-sm leading-relaxed font-medium">Do not run the program from inside the ZIP file. Extract everything to your Desktop first.</p>
                 </div>
-                <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 flex gap-8">
-                   <div className="w-16 h-16 bg-sky-600 rounded-2xl flex items-center justify-center text-2xl font-black shrink-0">2</div>
-                   <div className="space-y-2">
-                      <h4 className="text-xl font-black uppercase">Run the Batch File</h4>
-                      <p className="text-slate-400 leading-relaxed text-sm">Always use <code className="text-sky-400">LAUNCH_SKYFLOW.bat</code>. Do not try to open the .js files manually.</p>
-                   </div>
+                <div className="bg-slate-900/40 p-10 rounded-[40px] border border-slate-800 space-y-6 hover:border-sky-500/50 transition-all group">
+                   <div className="w-16 h-16 bg-sky-600 rounded-3xl flex items-center justify-center text-2xl font-black group-hover:scale-110 transition-transform">2</div>
+                   <h4 className="text-xl font-black uppercase tracking-tight">Install Node.js</h4>
+                   <p className="text-slate-500 text-sm leading-relaxed font-medium">Download the <b>LTS</b> version from nodejs.org. It is the engine that powers our weather simulation.</p>
                 </div>
-                <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 flex gap-8">
-                   <div className="w-16 h-16 bg-sky-600 rounded-2xl flex items-center justify-center text-2xl font-black shrink-0">3</div>
-                   <div className="space-y-2">
-                      <h4 className="text-xl font-black uppercase">Check the Cockpit</h4>
-                      <p className="text-slate-400 leading-relaxed text-sm">Make sure you have loaded into the game world. The connection will only turn green once you are sitting in the aircraft.</p>
-                   </div>
+                <div className="bg-slate-900/40 p-10 rounded-[40px] border border-slate-800 space-y-6 hover:border-sky-500/50 transition-all group">
+                   <div className="w-16 h-16 bg-sky-600 rounded-3xl flex items-center justify-center text-2xl font-black group-hover:scale-110 transition-transform">3</div>
+                   <h4 className="text-xl font-black uppercase tracking-tight">Run Launcher</h4>
+                   <p className="text-slate-500 text-sm leading-relaxed font-medium">Click <b>LAUNCH_SKYFLOW.bat</b>. This forces Node to run the script and bypasses Windows Notepad.</p>
                 </div>
               </div>
-            </div>
-          )}
-
-          {activeTab === NavigationTab.SETTINGS && (
-            <div className="max-w-2xl mx-auto py-12 space-y-8">
-               <h2 className="text-4xl font-black uppercase text-center italic">Troubleshooting Wizard</h2>
-               <div className="space-y-4">
-                  <div className="bg-amber-500/10 border border-amber-500/30 p-8 rounded-3xl">
-                     <h5 className="text-amber-400 font-black uppercase text-xs mb-2">"Open With..." Dialog appears?</h5>
-                     <p className="text-sm text-slate-300 leading-relaxed">This means your Batch file is failing to find Node.js. Try moving the folder to <code className="bg-slate-800 px-1 rounded">C:\SkyFlow</code> and run the launcher again as Administrator.</p>
-                  </div>
-                  <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl">
-                     <h5 className="text-sky-400 font-black uppercase text-xs mb-2">SimConnect Drivers?</h5>
-                     <p className="text-sm text-slate-400 leading-relaxed">If the engine is green but the Sim is waiting, ensure you have the SimConnect SDK installed. This usually comes with FSX/P3D but might need a manual install on some Windows versions.</p>
-                  </div>
-               </div>
             </div>
           )}
         </main>
