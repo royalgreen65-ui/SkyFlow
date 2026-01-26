@@ -1,110 +1,83 @@
 
 /**
- * SKYFLOW BRIDGE & UI SERVER
- * Handles weather injection and system notifications.
+ * SKYFLOW BRIDGE & UI SERVER v2.1
  */
 
 const WebSocket = require('ws');
-const { SimConnect } = require('node-simconnect');
-const notifier = require('node-notifier');
 const express = require('express');
 const path = require('path');
 const { exec } = require('child_process');
+const notifier = require('node-notifier');
+
+let SimConnect = null;
+try {
+  SimConnect = require('node-simconnect').SimConnect;
+} catch (e) {
+  console.log('\n[WARN] SimConnect drivers not found or failed to load.');
+  console.log('[TIP] You can still use the Dashboard to view METARs.');
+}
 
 console.clear();
 console.log('======================================================');
 console.log('            🚀 SKYFLOW FLIGHT BRIDGE 🚀              ');
 console.log('======================================================');
-console.log('');
-console.log('[TIP] Keep this window open for "Automated Updates" to work.');
-console.log('');
 
-// --- 1. START THE WEB SERVER ---
 const app = express();
 const UI_PORT = 3000;
 
 app.use(express.static(__dirname));
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
-app.listen(UI_PORT, () => {
-  console.log(`[STATUS] ✅ Dashboard is ready at http://localhost:${UI_PORT}`);
-  
-  const url = `http://localhost:${UI_PORT}`;
-  const start = (process.platform == 'darwin' ? 'open' : process.platform == 'win32' ? 'start' : 'xdg-open');
-  exec(`${start} ${url}`);
+const server = app.listen(UI_PORT, () => {
+  console.log(`[SYSTEM] Dashboard: http://localhost:${UI_PORT}`);
+  exec(`start http://localhost:${UI_PORT}`);
 });
 
-// --- 2. THE SIMULATOR LINK ---
 const wss = new WebSocket.Server({ port: 8080 });
 let simConnected = false;
 let sc = null;
 
-function notifyUser(title, message) {
-  notifier.notify({
-    title: title,
-    message: message,
-    appID: "SkyFlow Engine",
-    sound: true, 
-    wait: false
-  });
-}
-
 async function connectToSim() {
+  if (!SimConnect) return;
   try {
-    if (sc) await sc.close();
+    if (sc) { try { await sc.close(); } catch(e) {} }
+    
+    console.log('[SYSTEM] Searching for Flight Simulator...');
     sc = new SimConnect();
     await sc.open('SkyFlow Bridge');
+    
     simConnected = true;
-    console.log('[STATUS] ✈️  LINKED TO FLIGHT SIMULATOR!');
-    notifyUser("SkyFlow Connected!", "Link established. Automated sync is now available.");
+    console.log('[STATUS] ✅ SIMULATOR LINKED!');
     broadcastStatus();
   } catch (err) {
-    console.log('[STATUS] 😴 Waiting for game... (Retrying in 5s)');
     simConnected = false;
     broadcastStatus();
   }
 }
 
 function broadcastStatus() {
-  wss.clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify({ type: 'STATUS', connected: simConnected }));
-    }
+  const status = JSON.stringify({ type: 'STATUS', connected: simConnected });
+  wss.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) client.send(status);
   });
 }
 
 setInterval(() => {
-  if (!simConnected) connectToSim();
-}, 5000);
-
-connectToSim();
+  if (!simConnected && SimConnect) connectToSim();
+}, 10000);
 
 wss.on('connection', (ws) => {
-  console.log('[BRIDGE] 🔗 Connection established with Browser Dashboard.');
   broadcastStatus();
-
   ws.on('message', async (message) => {
     try {
       const data = JSON.parse(message);
-      if (data.type === 'CONNECT_SIM') await connectToSim();
-      if (data.type === 'INJECT_WEATHER') {
-        if (simConnected && sc) {
-          sc.weatherSetObservation(0, data.raw);
-          const mode = data.isAuto ? "(AUTO)" : "(MANUAL)";
-          console.log(`[ACTION] 🌦️  Weather Sync ${mode} -> ${data.icao}`);
-          
-          notifyUser(
-            data.isAuto ? "Auto-Sync Successful" : "Weather Injected!",
-            `Sim skies updated for ${data.icao}. Next check in 10 mins.`
-          );
-        } else {
-          console.log('[ERROR] ❌ Injection failed: Simulator closed.');
-        }
+      if (data.type === 'INJECT_WEATHER' && simConnected && sc) {
+        sc.weatherSetObservation(0, data.raw);
+        console.log(`[SYNC] ${data.icao} -> Success`);
       }
-    } catch (e) {
-      console.error('[ERROR] Communication error between dashboard and bridge.');
-    }
+    } catch (e) {}
   });
 });
 
 console.log('------------------------------------------------------');
-console.log('READY! Minimize this window and enjoy your flight.');
+console.log('KEEP THIS WINDOW OPEN WHILE FLYING.');
