@@ -1,13 +1,16 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { MetarData, FlightPlan } from "../types";
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+import { MetarData } from "../types";
 
 export const fetchMetarData = async (icao: string): Promise<MetarData> => {
+  // Retrieve the key injected into the window object by the App component
+  const apiKey = (window as any).SKYFLOW_API_KEY;
+  if (!apiKey) throw new Error("No API Key configured");
+
+  const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `Generate a realistic aviation METAR for ${icao} as of right now. Make it slightly complex with some cloud layers. Return it in JSON format.`,
+    contents: `Generate a realistic aviation METAR for ${icao} as of right now. Make it slightly complex. Return JSON.`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -39,25 +42,4 @@ export const fetchMetarData = async (icao: string): Promise<MetarData> => {
   });
 
   return JSON.parse(response.text.trim());
-};
-
-export const generateBriefing = async (plan: FlightPlan, departureMetar: MetarData, arrivalMetar: MetarData): Promise<string> => {
-  const prompt = `
-    Generate a professional aviation flight briefing for:
-    Aircraft: ${plan.aircraft}
-    Route: ${plan.departure} to ${plan.arrival}
-    Departure Weather: ${departureMetar.raw}
-    Arrival Weather: ${arrivalMetar.raw}
-    Cruise: FL${Math.round(plan.cruiseAltitude / 100)}
-    
-    Format the briefing with sections: OVERVIEW, DEPARTURE ANALYSIS, ENROUTE HAZARDS, ARRIVAL ADVISORY, and FUEL/WEIGHT ASSESSMENT. 
-    Be concise but professional.
-  `;
-
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: prompt
-  });
-
-  return response.text;
 };

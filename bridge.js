@@ -1,34 +1,46 @@
 
 /**
- * SKYFLOW CORE ENGINE v2.3
+ * SKYFLOW CORE ENGINE v2.7
+ * High-Performance Bridge for FSX/P3D
  */
 
 const WebSocket = require('ws');
 const express = require('express');
 const path = require('path');
 
+const app = express();
+const UI_PORT = 3000;
+
+// Ensure proper module resolution for .tsx files in the browser
+app.use((req, res, next) => {
+  if (req.url.endsWith('.tsx') || req.url.endsWith('.ts')) {
+    res.set('Content-Type', 'application/javascript');
+  }
+  next();
+});
+
+app.use(express.static(__dirname));
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+app.listen(UI_PORT, () => {
+  console.clear();
+  console.log('======================================================');
+  console.log('🚀 SKYFLOW ENGINE IS READY');
+  console.log('======================================================');
+  console.log(`\nURL: http://localhost:${UI_PORT}`);
+  console.log('STATUS: Instant Loading Active\n');
+});
+
+// SIMCONNECT BRIDGE LOGIC
 let SimConnect = null;
 try {
   SimConnect = require('node-simconnect').SimConnect;
 } catch (e) {
-  console.log('\n[!] SIMCONNECT DRIVER MISSING');
-  console.log('    You can still use the Dashboard to generate METARs,');
-  console.log('    but they won\'t inject into the game until you install SimConnect.\n');
+  console.log('[!] SimConnect Driver: Not detected. (Offline Mode)');
 }
-
-const app = express();
-const UI_PORT = 3000;
-
-app.use(express.static(__dirname));
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-
-app.listen(UI_PORT, () => {
-  console.log('======================================================');
-  console.log('✅ ENGINE STARTED SUCCESSFULLY');
-  console.log(`📡 DASHBOARD READY AT: http://localhost:${UI_PORT}`);
-  console.log('======================================================');
-  console.log('\n[!] KEEP THIS WINDOW OPEN WHILE FLYING [!]\n');
-});
 
 const wss = new WebSocket.Server({ port: 8080 });
 let simConnected = false;
@@ -40,32 +52,28 @@ async function connectToSim() {
     sc = new SimConnect();
     await sc.open('SkyFlow Bridge');
     simConnected = true;
-    console.log('[CONNECT] >>> SIMULATOR LINKED! <<<');
+    console.log('[OK] Linked to Flight Simulator.');
     broadcastStatus();
   } catch (err) {
     simConnected = false;
-    broadcastStatus();
   }
 }
 
 function broadcastStatus() {
   const status = JSON.stringify({ type: 'STATUS', connected: simConnected });
-  wss.clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) client.send(status);
-  });
+  wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) c.send(status); });
 }
 
-// Check for sim every 5 seconds
 setInterval(connectToSim, 5000);
 
 wss.on('connection', (ws) => {
   broadcastStatus();
-  ws.on('message', async (message) => {
+  ws.on('message', async (msg) => {
     try {
-      const data = JSON.parse(message);
+      const data = JSON.parse(msg);
       if (data.type === 'INJECT_WEATHER' && simConnected && sc) {
         sc.weatherSetObservation(0, data.raw);
-        console.log(`[INJECT] ${data.icao} successfully sent to Flight Sim.`);
+        console.log(`[SYNC] ${data.icao} injected.`);
       }
     } catch (e) {}
   });

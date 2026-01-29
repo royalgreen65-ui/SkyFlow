@@ -1,3 +1,4 @@
+
 @echo off
 setlocal enabledelayedexpansion
 title SkyFlow Professional Weather Engine
@@ -9,7 +10,7 @@ set "NODE_EXE=node"
 set "BRIDGE_JS=%~dp0bridge.js"
 
 echo ======================================================
-echo           SKYFLOW WEATHER ENGINE (v2.3)
+echo           SKYFLOW WEATHER ENGINE (v2.5)
 echo ======================================================
 echo.
 
@@ -64,15 +65,14 @@ echo DASHBOARD: http://localhost:3000
 echo ------------------------------------------------------
 echo.
 
-:: We use the absolute path to node and the absolute path to bridge.js
-:: This PREVENTS Windows from opening VS Code or Notepad.
-start http://localhost:3000
-"%NODE_EXE%" "%BRIDGE_JS%"
+:: Launch the server in the background
+start /b "" "%NODE_EXE%" "%BRIDGE_JS%"
 
-if %errorlevel% neq 0 (
-    echo.
-    color 0C
-    echo [CRITICAL] The engine stopped unexpectedly.
-    echo Make sure you didn't move any files out of the folder!
-    pause
-)
+:: Give the server 2 seconds to wake up before opening the browser
+timeout /t 2 /nobreak >nul
+
+:: Open the browser
+start http://localhost:3000
+
+echo [OK] Engine Running. Keep this window open.
+pause
