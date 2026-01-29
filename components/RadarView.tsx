@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import { MetarData } from '../types';
@@ -9,9 +8,10 @@ interface RadarViewProps {
 
 export const RadarView: React.FC<RadarViewProps> = ({ metar }) => {
   const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!svgRef.current) return;
+    if (!svgRef.current || !containerRef.current) return;
 
     const width = 400;
     const height = 400;
@@ -37,12 +37,12 @@ export const RadarView: React.FC<RadarViewProps> = ({ metar }) => {
     g.append("line").attr("x1", 0).attr("x2", 0).attr("y1", -200).attr("y2", 200).attr("stroke", "#1e293b");
 
     // Simulate weather echoes based on clouds
-    const echoCount = metar.clouds.length * 10 + 5;
+    const echoCount = (metar.clouds?.length || 0) * 8 + 6;
     const echoes = d3.range(echoCount).map(() => ({
-      x: (Math.random() - 0.5) * 300,
-      y: (Math.random() - 0.5) * 300,
-      r: Math.random() * 20 + 5,
-      opacity: Math.random() * 0.5 + 0.1
+      x: (Math.random() - 0.5) * 280,
+      y: (Math.random() - 0.5) * 280,
+      r: Math.random() * 25 + 10,
+      opacity: Math.random() * 0.4 + 0.1
     }));
 
     g.selectAll(".echo")
@@ -53,7 +53,7 @@ export const RadarView: React.FC<RadarViewProps> = ({ metar }) => {
       .attr("cy", d => d.y)
       .attr("r", d => d.r)
       .attr("fill", "#22c55e")
-      .attr("filter", "blur(8px)")
+      .attr("filter", "blur(10px)")
       .attr("opacity", d => d.opacity);
 
     // Radar sweep animation
@@ -66,26 +66,28 @@ export const RadarView: React.FC<RadarViewProps> = ({ metar }) => {
       .attr("stroke-width", 2)
       .attr("opacity", 0.6);
 
-    const animate = () => {
-      sweep.transition()
-        .duration(4000)
-        .ease(d3.easeLinear)
-        .attrTween("transform", () => {
-          return (t) => `rotate(${t * 360})`;
-        })
-        .on("end", animate);
+    let animationFrame: number;
+    const animate = (elapsed: number) => {
+      const rotation = (elapsed / 4000) * 360;
+      sweep.attr("transform", `rotate(${rotation})`);
+      animationFrame = requestAnimationFrame(animate);
     };
-    animate();
+    
+    animationFrame = requestAnimationFrame(animate);
 
+    return () => cancelAnimationFrame(animationFrame);
   }, [metar]);
 
   return (
-    <div className="flex flex-col items-center justify-center p-4 bg-slate-900 border border-slate-800 rounded-lg overflow-hidden relative">
-      <div className="absolute top-4 left-4 text-xs font-mono text-green-500 uppercase tracking-widest z-10">
-        Radar Sweep: Active
+    <div ref={containerRef} className="flex flex-col items-center justify-center p-6 bg-slate-900/80 border border-slate-800 rounded-[32px] overflow-hidden relative shadow-inner">
+      <div className="absolute top-6 left-6 flex items-center gap-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+        <span className="text-[10px] font-mono text-green-500 uppercase tracking-[0.2em] font-black">
+          RADAR_SWEEP_ACTIVE
+        </span>
       </div>
-      <svg ref={svgRef} width="400" height="400" className="max-w-full h-auto" />
-      <div className="mt-4 grid grid-cols-2 gap-4 w-full text-[10px] font-mono text-slate-500">
+      <svg ref={svgRef} viewBox="0 0 400 400" className="w-full h-auto max-w-[320px]" />
+      <div className="mt-6 grid grid-cols-2 gap-8 w-full text-[10px] font-mono text-slate-500 font-bold uppercase tracking-widest">
         <div>RANGE: 40NM</div>
         <div className="text-right">TILT: +1.5°</div>
       </div>

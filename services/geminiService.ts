@@ -1,10 +1,16 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { MetarData } from "../types";
 
 export const fetchMetarData = async (icao: string): Promise<MetarData> => {
-  // Use the pre-configured API key from the environment directly in the constructor
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // Use a fallback for the API key to avoid construction crash
+  const apiKey = (window as any).process?.env?.API_KEY || (process as any).env?.API_KEY;
+  
+  if (!apiKey) {
+    throw new Error("AVIONICS_FAULT: API Key is missing from environment.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+  
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `Generate a hyper-realistic aviation METAR for ${icao}. Include temperature, wind, and complex cloud layers. Return as JSON.`,
@@ -37,6 +43,10 @@ export const fetchMetarData = async (icao: string): Promise<MetarData> => {
       }
     }
   });
+
+  if (!response.text) {
+    throw new Error("COMM_LINK_FAILURE: No data returned from atmospheric core.");
+  }
 
   return JSON.parse(response.text.trim());
 };
