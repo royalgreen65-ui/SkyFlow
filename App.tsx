@@ -33,45 +33,51 @@ const App: React.FC = () => {
       message,
       level
     };
-    setLogs(prev => [...prev.slice(-12), newLog]);
-    console.log(`[APP] ${message}`);
+    setLogs(prev => [...prev.slice(-15), newLog]);
+    // Also push to the terminal overlay in index.html
+    (window as any).console.log(message);
   };
 
   useEffect(() => {
+    console.log("App: Component mounted. Initializing sub-systems...");
     addLog("Avionics core active.", "INFO");
     fetchPersistentLogs();
   }, []);
 
   const fetchPersistentLogs = async () => {
     try {
+      addLog("DISK: Checking for persistent log file...", "INFO");
       const res = await fetch('/api/logs');
       if (res.ok) {
         const text = await res.text();
         setPersistentLogs(text);
+        addLog("DISK: Persistent logs retrieved.", "SUCCESS");
       } else {
         setPersistentLogs('No logs found on disk.');
+        addLog("DISK: No remote bridge log available (Static Mode).", "WARN");
       }
     } catch (e) {
-      console.log("Persistent logs only available when running bridge.js locally.");
+      addLog("DISK: Failed to reach bridge API (Likely running on GH Pages).", "INFO");
     }
   };
 
   const clearPersistentLogs = async () => {
-    if (!window.confirm("Wipe 'skyflow_avionics.log' from your computer? This cannot be undone.")) return;
+    if (!window.confirm("Wipe 'skyflow_avionics.log' from your computer?")) return;
     try {
       const res = await fetch('/api/logs', { method: 'DELETE' });
       if (res.ok) {
-        addLog("DISK: Log file wiped.", "SUCCESS");
+        addLog("DISK: Remote log file wiped.", "SUCCESS");
         setPersistentLogs("[LOG CLEARED BY USER]");
       }
     } catch (e) {
-      addLog("DISK: Failed to clear log file.", "ERROR");
+      addLog("DISK: Could not contact bridge to wipe file.", "ERROR");
     }
   };
 
   useEffect(() => {
     let reconnectTimer: any;
     const connectBridge = () => {
+      console.log("Net: Attempting bridge handshake...");
       try {
         const ws = new WebSocket('ws://localhost:8080');
         ws.onopen = () => {
@@ -113,7 +119,7 @@ const App: React.FC = () => {
         wsRef.current.send(JSON.stringify({ type: 'INJECT_WEATHER', icao: data.icao, raw: data.raw }));
         addLog(`SYNC: ${data.icao} injected to simulator`, "SUCCESS");
       } else {
-        addLog(`PREVIEW: Local data for ${data.icao} loaded.`, "SUCCESS");
+        addLog(`PREVIEW: ${data.icao} loaded in static preview mode.`, "SUCCESS");
       }
     } catch (error: any) {
       addLog(`FAULT: ${error.message}`, 'ERROR');
@@ -169,8 +175,8 @@ const App: React.FC = () => {
                  </p>
                  <button onClick={fetchPersistentLogs} className="text-[8px] text-sky-500 font-black hover:text-white transition-colors">REFRESH DISK LOGS</button>
               </div>
-              <div className="space-y-1 overflow-y-auto max-h-40">
-                {logs.map(l => (
+              <div className="space-y-1 overflow-y-auto max-h-48">
+                {logs.length === 0 ? <p className="opacity-30">Awaiting system events...</p> : logs.map(l => (
                   <div key={l.id} className="flex gap-4">
                     <span className="opacity-20 text-white">[{l.timestamp}]</span>
                     <span className={l.level === 'SUCCESS' ? 'text-green-500' : l.level === 'ERROR' ? 'text-red-500' : l.level === 'WARN' ? 'text-yellow-500' : 'text-sky-400'}>{l.message}</span>
@@ -193,9 +199,9 @@ const App: React.FC = () => {
                 </div>
               </div>
               <div className="bg-black/80 p-6 rounded-3xl border border-slate-800 font-mono text-[11px] h-96 overflow-y-auto whitespace-pre text-slate-400 border-l-4 border-l-sky-500/30">
-                {persistentLogs || 'Log file is empty or unreachable. Ensure bridge.js is running locally.'}
+                {persistentLogs || 'Log file is unreachable in static preview mode. Run bridge.js locally to enable file logging.'}
               </div>
-              <div className="grid grid-cols-2 gap-4 text-[9px] font-bold text-slate-600 uppercase tracking-widest text-center">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[9px] font-bold text-slate-600 uppercase tracking-widest text-center">
                 <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">Auto-Purge Cycle: 30 Days</div>
                 <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">Path: ./skyflow_avionics.log</div>
               </div>
@@ -203,19 +209,12 @@ const App: React.FC = () => {
           </div>
         );
 
-      case NavigationTab.PLANNER:
-      case NavigationTab.SCENARIOS:
-      case NavigationTab.BRIEFING:
-      case NavigationTab.XGAUGE:
-      case NavigationTab.SETUP:
+      default:
         return (
           <div className="max-w-4xl mx-auto p-12 text-center border-2 border-dashed border-slate-800 rounded-[40px] mt-20">
             <p className="text-slate-600 font-black uppercase tracking-[0.4em]">System Module Standby</p>
           </div>
         );
-
-      default:
-        return null;
     }
   };
 
@@ -247,7 +246,7 @@ const App: React.FC = () => {
             </button>
           ))}
           <div className="mt-auto p-4 border-t border-slate-800/50 text-center opacity-30">
-             <p className="text-[7px] text-slate-400 uppercase font-black tracking-[0.3em]">Build 2.11-STABLE</p>
+             <p className="text-[7px] text-slate-400 uppercase font-black tracking-[0.3em]">Build 2.11-RESILIENT</p>
           </div>
         </aside>
 
