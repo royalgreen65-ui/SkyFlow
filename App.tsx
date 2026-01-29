@@ -36,11 +36,11 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    const key = (window as any).process?.env?.API_KEY || (process as any).env?.API_KEY;
-    if (!key) {
-      addLog("API CONFIG: System running in limited mode.", "WARN");
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      addLog("API CONFIG: Key not detected. Weather injection disabled.", "ERROR");
     } else {
-      addLog("SkyFlow Engine Initialized.", "SUCCESS");
+      addLog("SkyFlow Intelligence Online", "SUCCESS");
     }
   }, []);
 
@@ -92,7 +92,7 @@ const App: React.FC = () => {
         wsRef.current.send(JSON.stringify({ type: 'INJECT_WEATHER', icao: data.icao, raw: data.raw }));
         addLog(`SYNC: ${data.icao} weather pushed to FSX`, 'SUCCESS');
       } else {
-        addLog(`DATA: ${data.icao} retrieved (Bridge Offline)`, 'INFO');
+        addLog(`DATA: ${data.icao} retrieved (Local Preview)`, 'INFO');
       }
     } catch (error: any) {
       addLog(`API ERROR: ${error.message}`, 'ERROR');
@@ -108,8 +108,8 @@ const App: React.FC = () => {
           <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="bg-slate-900/60 p-10 rounded-[48px] border border-slate-800/50 shadow-2xl flex items-center justify-between gap-10">
               <div className="flex-1">
-                <h2 className="text-4xl font-black uppercase tracking-tighter text-white italic">Weather Injection</h2>
-                <p className="text-slate-500 text-sm mt-2 font-medium tracking-wide">Generate hyper-realistic weather telemetry via Gemini AI.</p>
+                <h2 className="text-4xl font-black uppercase tracking-tighter text-white italic leading-tight">SkyFlow Weather<br/>Injection</h2>
+                <p className="text-slate-500 text-sm mt-3 font-medium tracking-wide">Sync hyper-realistic METAR data to FSX in real-time.</p>
               </div>
               <div className="flex gap-4">
                 <input 
@@ -117,7 +117,7 @@ const App: React.FC = () => {
                   maxLength={4} 
                   value={stationQuery} 
                   onChange={e => setStationQuery(e.target.value.toUpperCase())} 
-                  className="w-36 bg-black border-2 border-slate-800 rounded-3xl p-5 text-3xl font-black text-center text-sky-400 outline-none focus:border-sky-500 transition-all uppercase" 
+                  className="w-36 bg-black border-2 border-slate-800 rounded-3xl p-5 text-3xl font-black text-center text-sky-400 outline-none focus:border-sky-500 transition-all uppercase placeholder:text-slate-800" 
                   placeholder="KLAX" 
                 />
                 <button 
@@ -125,59 +125,75 @@ const App: React.FC = () => {
                   disabled={loading} 
                   className={`px-10 rounded-3xl font-black uppercase tracking-widest text-[11px] transition-all ${loading ? 'bg-slate-800 text-slate-600' : 'bg-sky-600 hover:bg-sky-500 text-white shadow-xl shadow-sky-900/30 active:scale-95'}`}
                 >
-                  {loading ? 'BUSY...' : 'FETCH & INJECT'}
+                  {loading ? 'BUSY...' : 'SYNC ENGINE'}
                 </button>
               </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div className="space-y-4">
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-600 pl-2">Metar Telemetry</h3>
-                {currentMetar ? <MetarDisplay data={currentMetar} /> : <EmptyState text="Awaiting Station Query" />}
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-600 pl-2">Atmospheric Telemetry</h3>
+                {currentMetar ? <MetarDisplay data={currentMetar} /> : <div className="h-64 border-2 border-dashed border-slate-900/50 rounded-[32px] flex items-center justify-center text-slate-800 font-bold uppercase tracking-widest text-[10px]">Awaiting Uplink...</div>}
               </div>
               <div className="space-y-4">
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-600 pl-2">Volumetric Visualization</h3>
-                {currentMetar ? <RadarView metar={currentMetar} /> : <EmptyState text="Radar Standby" />}
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-600 pl-2">Radar Echo Projection</h3>
+                {currentMetar ? <RadarView metar={currentMetar} /> : <div className="h-64 border-2 border-dashed border-slate-900/50 rounded-[32px] flex items-center justify-center text-slate-800 font-bold uppercase tracking-widest text-[10px]">Radar Standby</div>}
               </div>
             </div>
             
-            <SystemStream logs={logs} />
+            <div className="bg-black/60 p-6 rounded-[24px] border border-slate-800/50 font-mono text-[10px] text-slate-600 shadow-2xl">
+              <p className="font-black mb-3 uppercase text-slate-500 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>
+                System Log Stream
+              </p>
+              <div className="space-y-1">
+                {logs.length === 0 ? <div className="opacity-30">Monitoring avionics bus...</div> : logs.map(l => (
+                  <div key={l.id} className="py-0.5"><span className="opacity-40">[{l.timestamp}]</span> <span className={l.level === 'SUCCESS' ? 'text-green-500' : l.level === 'ERROR' ? 'text-red-500' : 'text-sky-400'}>{l.message}</span></div>
+                ))}
+              </div>
+            </div>
           </div>
         );
 
       case NavigationTab.PLANNER:
         return (
           <div className="max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="bg-slate-900/60 p-12 rounded-[48px] border border-slate-800/50 shadow-2xl space-y-10">
-              <h2 className="text-4xl font-black uppercase tracking-tighter text-white italic">Flight Dispatch</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <PlanInput label="Departure" value={flightPlan.departure} onChange={v => setFlightPlan({...flightPlan, departure: v})} />
-                <PlanInput label="Arrival" value={flightPlan.arrival} onChange={v => setFlightPlan({...flightPlan, arrival: v})} />
-                <PlanInput label="Alternate" value={flightPlan.alternate} onChange={v => setFlightPlan({...flightPlan, alternate: v})} />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-2">Selected Aircraft</label>
-                  <select 
-                    value={flightPlan.aircraft} 
-                    onChange={e => setFlightPlan({...flightPlan, aircraft: e.target.value})} 
-                    className="w-full bg-black border border-slate-800 rounded-2xl p-4 font-black text-lg text-white appearance-none cursor-pointer outline-none focus:border-sky-600"
-                  >
-                    {FSX_AIRCRAFT.map(ac => <option key={ac} value={ac}>{ac}</option>)}
-                  </select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <PlanInput label="Cruise (FT)" value={flightPlan.cruiseAltitude.toString()} type="number" onChange={v => setFlightPlan({...flightPlan, cruiseAltitude: parseInt(v) || 0})} />
-                  <PlanInput label="Fuel (LB)" value={flightPlan.fuelWeight.toString()} type="number" onChange={v => setFlightPlan({...flightPlan, fuelWeight: parseInt(v) || 0})} />
-                </div>
-              </div>
-              <button 
-                onClick={() => { addLog("Flight Plan Finalized", "SUCCESS"); setActiveTab(NavigationTab.BRIEFING); }} 
-                className="w-full bg-sky-600 hover:bg-sky-500 py-6 rounded-3xl font-black uppercase tracking-[0.2em] text-sm shadow-2xl transition-all active:scale-95"
-              >
-                Compile Briefing Package
-              </button>
-            </div>
+             <div className="bg-slate-900/60 p-12 rounded-[48px] border border-slate-800/50 shadow-2xl space-y-10">
+               <h2 className="text-4xl font-black uppercase tracking-tighter text-white italic">Flight Dispatch</h2>
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-2">Departure</label>
+                    <input type="text" value={flightPlan.departure} onChange={e => setFlightPlan({...flightPlan, departure: e.target.value.toUpperCase()})} className="w-full bg-black border border-slate-800 rounded-2xl p-4 font-black text-xl text-sky-400 outline-none focus:border-sky-600" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-2">Arrival</label>
+                    <input type="text" value={flightPlan.arrival} onChange={e => setFlightPlan({...flightPlan, arrival: e.target.value.toUpperCase()})} className="w-full bg-black border border-slate-800 rounded-2xl p-4 font-black text-xl text-sky-400 outline-none focus:border-sky-600" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-2">Alternate</label>
+                    <input type="text" value={flightPlan.alternate} onChange={e => setFlightPlan({...flightPlan, alternate: e.target.value.toUpperCase()})} className="w-full bg-black border border-slate-800 rounded-2xl p-4 font-black text-xl text-slate-400 outline-none focus:border-sky-600" />
+                  </div>
+               </div>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-2">Aircraft Registry</label>
+                    <select value={flightPlan.aircraft} onChange={e => setFlightPlan({...flightPlan, aircraft: e.target.value})} className="w-full bg-black border border-slate-800 rounded-2xl p-4 font-black text-lg text-white appearance-none cursor-pointer outline-none focus:border-sky-600">
+                      {FSX_AIRCRAFT.map(ac => <option key={ac} value={ac}>{ac}</option>)}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-2">Cruise (FT)</label>
+                      <input type="number" value={flightPlan.cruiseAltitude} onChange={e => setFlightPlan({...flightPlan, cruiseAltitude: parseInt(e.target.value) || 0})} className="w-full bg-black border border-slate-800 rounded-2xl p-4 font-black text-lg text-white outline-none" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-2">Fuel (LB)</label>
+                      <input type="number" value={flightPlan.fuelWeight} onChange={e => setFlightPlan({...flightPlan, fuelWeight: parseInt(e.target.value) || 0})} className="w-full bg-black border border-slate-800 rounded-2xl p-4 font-black text-lg text-white outline-none" />
+                    </div>
+                  </div>
+               </div>
+               <button onClick={() => { addLog("Mission Compiled Successfully", "SUCCESS"); setActiveTab(NavigationTab.BRIEFING); }} className="w-full bg-sky-600 hover:bg-sky-500 py-6 rounded-3xl font-black uppercase tracking-[0.2em] text-sm shadow-2xl transition-all active:scale-95">Compile Briefing Package</button>
+             </div>
           </div>
         );
 
@@ -186,11 +202,24 @@ const App: React.FC = () => {
           <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
             <div className="text-center">
               <h2 className="text-5xl font-black uppercase tracking-tighter text-white italic">Historical Scenarios</h2>
-              <p className="text-slate-500 text-sm mt-4 font-bold tracking-widest uppercase">Simulate famous aviation challenges</p>
+              <p className="text-slate-500 text-sm mt-4 font-bold tracking-widest uppercase">Experience famous weather incidents in FSX</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
               {SCENARIOS.map(s => (
-                <ScenarioCard key={s.id} scenario={s} onInject={() => handleInject(s.icao)} />
+                <div key={s.id} className="bg-slate-900/40 border border-slate-800 rounded-[40px] overflow-hidden group hover:border-sky-500/50 transition-all shadow-xl">
+                  <div className="h-48 relative overflow-hidden">
+                    <img src={s.imageUrl} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700" alt={s.title} />
+                    <div className="absolute top-4 right-4 bg-red-600 text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-lg">{s.severity}</div>
+                  </div>
+                  <div className="p-8 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-xl font-black italic">{s.title}</h3>
+                      <span className="text-sky-500 font-bold text-xs">{s.icao}</span>
+                    </div>
+                    <p className="text-slate-400 text-sm leading-relaxed h-20 line-clamp-3">{s.description}</p>
+                    <button onClick={() => handleInject(s.icao)} className="w-full py-4 bg-slate-800 hover:bg-sky-600 text-white rounded-2xl text-[9px] font-black uppercase tracking-[0.2em] transition-all">Re-Live Conditions</button>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -199,26 +228,39 @@ const App: React.FC = () => {
       case NavigationTab.BRIEFING:
         return (
           <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="bg-slate-900 border border-slate-800 p-12 rounded-[48px] space-y-8">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h2 className="text-4xl font-black italic">Mission Briefing</h2>
-                  <p className="text-slate-500 font-bold tracking-widest uppercase text-[10px] mt-1">Route: {flightPlan.departure} » {flightPlan.arrival}</p>
-                </div>
-                <div className="text-right">
-                  <span className="bg-green-500/10 text-green-500 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-green-500/20">Operational Ready</span>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-6">
-                <StatsCard label="Route Distance" value="382 NM" />
-                <StatsCard label="T/O Weight" value="142,500 LB" />
-                <StatsCard label="Alternate" value={flightPlan.alternate} />
-              </div>
-              <div className="p-8 bg-black/40 rounded-[32px] border border-slate-800 space-y-4 font-medium text-slate-400 text-sm leading-relaxed">
-                <p>Weather at {flightPlan.departure}: {currentMetar?.raw || 'Pending update.'}</p>
-                <p>En-route hazards: Light icing expected above FL240. No significant SIGMETS reported for transit area.</p>
-              </div>
-            </div>
+             <div className="bg-slate-900 border border-slate-800 p-12 rounded-[48px] space-y-8">
+               <div className="flex justify-between items-start">
+                  <div>
+                    <h2 className="text-4xl font-black italic">Mission Briefing</h2>
+                    <p className="text-slate-500 font-bold tracking-widest uppercase text-[10px] mt-1">Operational Summary: {flightPlan.departure} » {flightPlan.arrival}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="bg-green-500/10 text-green-500 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-green-500/20">Operational Clear</span>
+                  </div>
+               </div>
+               
+               <div className="grid grid-cols-3 gap-6">
+                  <div className="p-6 bg-slate-800/30 border border-slate-700/50 rounded-3xl text-center">
+                    <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Risk Profile</p>
+                    <p className="text-xl font-black text-yellow-400 italic">MODERATE</p>
+                  </div>
+                  <div className="p-6 bg-slate-800/30 border border-slate-700/50 rounded-3xl text-center">
+                    <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Fuel Weight</p>
+                    <p className="text-xl font-black text-sky-400 italic">{flightPlan.fuelWeight} LB</p>
+                  </div>
+                  <div className="p-6 bg-slate-800/30 border border-slate-700/50 rounded-3xl text-center">
+                    <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Alternate</p>
+                    <p className="text-xl font-black text-slate-400 italic">{flightPlan.alternate}</p>
+                  </div>
+               </div>
+
+               <div className="space-y-4 pt-8 border-t border-slate-800">
+                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Weather Advisory</h3>
+                  <div className="bg-black/40 p-8 rounded-3xl border border-slate-800/50 space-y-4 font-medium text-slate-400 text-sm leading-relaxed">
+                    <p>Expected cruise altitude FL{Math.round(flightPlan.cruiseAltitude / 100)}. Current METAR for {flightPlan.departure}: {currentMetar?.raw || 'N/A'}. Warning: Potential turbulence over mountain areas.</p>
+                  </div>
+               </div>
+             </div>
           </div>
         );
 
@@ -230,12 +272,30 @@ const App: React.FC = () => {
           <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
             <div className="text-center space-y-4">
               <h2 className="text-5xl font-black uppercase tracking-tighter text-white italic">Setup Center</h2>
-              <p className="text-slate-500 max-w-xl mx-auto uppercase tracking-widest text-[10px] font-bold">Follow these steps to link SkyFlow to FSX</p>
+              <p className="text-slate-500 max-w-xl mx-auto uppercase tracking-widest text-[10px] font-bold">Bridge installation guide for FSX and Prepar3D</p>
             </div>
-            <div className="grid gap-6">
-              <SetupStep num="1" title="Acquire Bridge" desc="Download skyflow-bridge.exe from your dispatch console." active={isBridgeActive} />
-              <SetupStep num="2" title="Installation" desc="Move bridge.exe to your main Flight Simulator folder." active={isBridgeActive} />
-              <SetupStep num="3" title="Ignition" desc="Run bridge.exe and verify the 'LINKED' status above." active={isBridgeActive} />
+            <div className="grid gap-8">
+              <div className={`p-8 rounded-[40px] border flex gap-10 bg-slate-900/40 border-slate-800`}>
+                <div className="w-14 h-14 rounded-2xl bg-sky-600 flex items-center justify-center font-black text-xl text-white">1</div>
+                <div className="flex-1 space-y-2">
+                  <h3 className="text-xl font-black uppercase tracking-tight text-white">Acquire Bridge</h3>
+                  <p className="text-slate-400 text-sm leading-relaxed">Locate 'skyflow-bridge.exe' in your downloaded package. This is the link between your simulator and this dashboard.</p>
+                </div>
+              </div>
+              <div className={`p-8 rounded-[40px] border flex gap-10 bg-slate-900/40 border-slate-800`}>
+                <div className="w-14 h-14 rounded-2xl bg-sky-600 flex items-center justify-center font-black text-xl text-white">2</div>
+                <div className="flex-1 space-y-2">
+                  <h3 className="text-xl font-black uppercase tracking-tight text-white">Simulation Directory</h3>
+                  <p className="text-slate-400 text-sm leading-relaxed">Move the bridge executable to your main Flight Simulator installation folder (where FSX.exe lives).</p>
+                </div>
+              </div>
+              <div className={`p-8 rounded-[40px] border flex gap-10 bg-slate-900/40 border-slate-800`}>
+                <div className="w-14 h-14 rounded-2xl bg-sky-600 flex items-center justify-center font-black text-xl text-white">3</div>
+                <div className="flex-1 space-y-2">
+                  <h3 className="text-xl font-black uppercase tracking-tight text-white">Verification</h3>
+                  <p className="text-slate-400 text-sm leading-relaxed">Run the bridge and refresh this page. The 'Bridge' status indicator in the header will turn green.</p>
+                </div>
+              </div>
             </div>
           </div>
         );
@@ -243,19 +303,30 @@ const App: React.FC = () => {
       case NavigationTab.SETTINGS:
         return (
           <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="bg-slate-900/60 p-12 rounded-[48px] border border-slate-800/50 shadow-2xl space-y-12">
-              <h2 className="text-4xl font-black uppercase tracking-tighter text-white italic">System Settings</h2>
-              <div className="space-y-6">
-                <SettingsToggle label="Global AI Enhancement" desc="Uses Gemini Pro for hyper-realistic METAR generation." active />
-                <SettingsToggle label="Auto-Bridge Link" desc="Automatically searches for local FSX instances on startup." active />
-                <SettingsToggle label="Smooth Pressure Transition" desc="Gradually updates altimeter to prevent FSX crashes." active={false} />
-              </div>
-            </div>
+             <div className="bg-slate-900/60 p-12 rounded-[48px] border border-slate-800/50 shadow-2xl space-y-12">
+               <h2 className="text-4xl font-black uppercase tracking-tighter text-white italic">Engine Config</h2>
+               <div className="grid gap-10">
+                  <div className="flex items-center justify-between p-6 bg-black/40 rounded-3xl border border-slate-800">
+                    <div>
+                      <p className="font-black text-sm uppercase tracking-tight">Weather Smoothing</p>
+                      <p className="text-slate-500 text-xs">Prevents sudden pressure jumps during injection.</p>
+                    </div>
+                    <div className="w-14 h-8 bg-sky-600 rounded-full p-1"><div className="w-6 h-6 bg-white rounded-full translate-x-6" /></div>
+                  </div>
+                  <div className="flex items-center justify-between p-6 bg-black/40 rounded-3xl border border-slate-800">
+                    <div>
+                      <p className="font-black text-sm uppercase tracking-tight">Auto-Sync On Load</p>
+                      <p className="text-slate-500 text-xs">Injects departure weather as soon as the sim is detected.</p>
+                    </div>
+                    <div className="w-14 h-8 bg-slate-800 rounded-full p-1"><div className="w-6 h-6 bg-white rounded-full" /></div>
+                  </div>
+               </div>
+             </div>
           </div>
         );
 
       default:
-        return <div className="p-20 text-center text-slate-700 font-black uppercase tracking-widest">Section Under Maintenance</div>;
+        return null;
     }
   };
 
@@ -266,12 +337,18 @@ const App: React.FC = () => {
           <div className="w-10 h-10 bg-sky-600 rounded-xl flex items-center justify-center text-xl font-black italic shadow-lg shadow-sky-900/20">S</div>
           <div>
             <h1 className="text-lg font-black uppercase tracking-tighter leading-none">SkyFlow</h1>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-1">Universal Cockpit Dashboard</p>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-1">Universal Avionics Dashboard</p>
           </div>
         </div>
         <div className="flex gap-3">
-          <StatusBadge active={isBridgeActive} label="Bridge" activeText="LINKED" idleText="OFFLINE" onClick={() => setActiveTab(NavigationTab.SETUP)} />
-          <StatusBadge active={isSimConnected} label="Sim" activeText="READY" idleText="WAITING" color="green" />
+          <div className={`px-4 py-2 rounded-xl border flex items-center gap-3 transition-all ${isBridgeActive ? 'bg-sky-500/10 border-sky-500/30 text-sky-400' : 'bg-slate-800/50 border-slate-700 text-slate-600'}`}>
+            <div className={`w-2 h-2 rounded-full ${isBridgeActive ? 'bg-sky-400 animate-pulse' : 'bg-slate-700'}`} />
+            <span className="text-[10px] font-black uppercase tracking-[0.1em]">Bridge: {isBridgeActive ? 'LINKED' : 'OFFLINE'}</span>
+          </div>
+          <div className={`px-4 py-2 rounded-xl border flex items-center gap-3 transition-all ${isSimConnected ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-slate-800/50 border-slate-700 text-slate-600'}`}>
+            <div className={`w-2 h-2 rounded-full ${isSimConnected ? 'bg-green-400 animate-pulse' : 'bg-slate-700'}`} />
+            <span className="text-[10px] font-black uppercase tracking-[0.1em]">Sim: {isSimConnected ? 'READY' : 'WAITING'}</span>
+          </div>
         </div>
       </header>
 
@@ -286,8 +363,13 @@ const App: React.FC = () => {
               {tab}
             </button>
           ))}
-          <div className="mt-auto p-4 bg-slate-900/50 rounded-2xl border border-slate-800/50">
-            <p className="text-[8px] text-slate-600 uppercase font-black tracking-widest text-center">Version 2.9-Stable</p>
+          <div className="mt-auto p-4 bg-slate-900/50 rounded-2xl border border-slate-800/50 text-center">
+            <p className="text-[8px] text-slate-600 uppercase font-black tracking-widest mb-1">Engine v2.9-STABLE</p>
+            <div className="flex justify-center gap-1">
+              <div className="w-1 h-1 rounded-full bg-green-500"></div>
+              <div className="w-1 h-1 rounded-full bg-green-500"></div>
+              <div className="w-1 h-1 rounded-full bg-slate-700"></div>
+            </div>
           </div>
         </aside>
 
@@ -298,87 +380,5 @@ const App: React.FC = () => {
     </div>
   );
 };
-
-const EmptyState = ({ text }: { text: string }) => (
-  <div className="h-64 border-2 border-dashed border-slate-900 rounded-[32px] flex items-center justify-center text-slate-800 font-bold uppercase tracking-widest text-[10px]">
-    {text}
-  </div>
-);
-
-const SystemStream = ({ logs }: { logs: LogEntry[] }) => (
-  <div className="bg-black/60 p-6 rounded-[24px] border border-slate-800/50 font-mono text-[10px] text-slate-600 shadow-2xl">
-    <p className="font-black mb-3 uppercase text-slate-500 flex items-center gap-2">
-      <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>
-      Engine Log
-    </p>
-    <div className="space-y-1">
-      {logs.length === 0 ? <div className="opacity-30">Monitoring avionics stream...</div> : logs.map(l => (
-        <div key={l.id} className="py-0.5"><span className="opacity-40">[{l.timestamp}]</span> <span className={l.level === 'SUCCESS' ? 'text-green-500' : l.level === 'ERROR' ? 'text-red-500' : 'text-sky-400'}>{l.message}</span></div>
-      ))}
-    </div>
-  </div>
-);
-
-const PlanInput = ({ label, value, onChange, type = "text" }: any) => (
-  <div className="space-y-2">
-    <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-2">{label}</label>
-    <input 
-      type={type} 
-      value={value} 
-      onChange={e => onChange(e.target.value.toUpperCase())} 
-      className="w-full bg-black border border-slate-800 rounded-2xl p-4 font-black text-xl text-sky-400 outline-none focus:border-sky-600" 
-    />
-  </div>
-);
-
-const StatsCard = ({ label, value }: any) => (
-  <div className="p-6 bg-slate-800/30 border border-slate-700/50 rounded-3xl text-center">
-    <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">{label}</p>
-    <p className="text-xl font-black text-white italic">{value}</p>
-  </div>
-);
-
-const ScenarioCard = ({ scenario, onInject }: any) => (
-  <div className="bg-slate-900/40 border border-slate-800 rounded-[40px] overflow-hidden group hover:border-sky-500/50 transition-all shadow-xl">
-    <div className="h-48 relative overflow-hidden">
-      <img src={scenario.imageUrl} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700" alt={scenario.title} />
-      <div className="absolute top-4 right-4 bg-red-600 text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-lg">{scenario.severity}</div>
-    </div>
-    <div className="p-8 space-y-4">
-      <h3 className="text-xl font-black italic">{scenario.title}</h3>
-      <p className="text-slate-400 text-sm leading-relaxed h-20 line-clamp-3">{scenario.description}</p>
-      <button onClick={onInject} className="w-full py-3 bg-slate-800 hover:bg-sky-600 text-white rounded-xl text-[9px] font-black uppercase tracking-[0.2em] transition-all">Re-Live Scenario</button>
-    </div>
-  </div>
-);
-
-const SetupStep = ({ num, title, desc, active }: any) => (
-  <div className={`p-8 rounded-[32px] border transition-all flex items-center gap-8 ${active ? 'bg-green-500/5 border-green-500/20' : 'bg-slate-900/40 border-slate-800'}`}>
-    <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-lg ${active ? 'bg-green-500 text-white' : 'bg-slate-800 text-slate-600'}`}>{active ? '✓' : num}</div>
-    <div>
-      <h4 className={`font-black uppercase tracking-tight ${active ? 'text-green-500' : 'text-white'}`}>{title}</h4>
-      <p className="text-slate-500 text-sm font-medium">{desc}</p>
-    </div>
-  </div>
-);
-
-const SettingsToggle = ({ label, desc, active }: any) => (
-  <div className="flex items-center justify-between p-6 bg-black/40 rounded-3xl border border-slate-800">
-    <div>
-      <p className="font-black text-sm uppercase tracking-tight">{label}</p>
-      <p className="text-slate-500 text-xs font-medium">{desc}</p>
-    </div>
-    <div className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all ${active ? 'bg-sky-600' : 'bg-slate-800'}`}>
-      <div className={`w-4 h-4 bg-white rounded-full transition-all ${active ? 'translate-x-6' : 'translate-x-0'}`} />
-    </div>
-  </div>
-);
-
-const StatusBadge = ({ active, label, activeText, idleText, color = "sky", onClick }: any) => (
-  <button onClick={onClick} className={`px-4 py-2 rounded-xl border flex items-center gap-3 transition-all ${active ? `bg-${color}-500/10 border-${color}-500/30 text-${color}-400` : 'bg-slate-800/50 border-slate-700 text-slate-600'}`}>
-    <div className={`w-2 h-2 rounded-full ${active ? `bg-${color}-400 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)]` : 'bg-slate-700'}`} />
-    <span className="text-[10px] font-black uppercase tracking-[0.1em]">{label}: {active ? activeText : idleText}</span>
-  </button>
-);
 
 export default App;
