@@ -3,14 +3,14 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { MetarData } from "../types";
 
 export const fetchMetarData = async (icao: string): Promise<MetarData> => {
-  // Retrieve the key injected into the window object by the App component
-  const apiKey = (window as any).SKYFLOW_API_KEY;
-  if (!apiKey) throw new Error("No API Key configured");
+  // Use the pre-configured API key from the environment
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) throw new Error("API Engine Configuration Missing");
 
   const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `Generate a realistic aviation METAR for ${icao} as of right now. Make it slightly complex. Return JSON.`,
+    contents: `Generate a hyper-realistic aviation METAR for ${icao}. Include temperature, wind, and complex cloud layers. Return as JSON.`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
