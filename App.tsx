@@ -3,8 +3,6 @@ import { MetarData, NavigationTab, LogEntry, FlightPlan } from './types';
 import { fetchMetarData } from './services/geminiService';
 import { MetarDisplay } from './components/MetarDisplay';
 import { RadarView } from './components/RadarView';
-import { XGaugeConfig } from './components/XGaugeConfig';
-import { SCENARIOS, FSX_AIRCRAFT } from './constants';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavigationTab>(NavigationTab.DASHBOARD);
@@ -15,14 +13,6 @@ const App: React.FC = () => {
   const [isBridgeActive, setIsBridgeActive] = useState(false);
   const [persistentLogs, setPersistentLogs] = useState<string>('');
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [flightPlan, setFlightPlan] = useState<FlightPlan>({
-    departure: 'KLAX',
-    arrival: 'KSFO',
-    alternate: 'KSJC',
-    aircraft: 'Boeing 737-800',
-    cruiseAltitude: 36000,
-    fuelWeight: 18500
-  });
   
   const wsRef = useRef<WebSocket | null>(null);
   
@@ -34,50 +24,44 @@ const App: React.FC = () => {
       level
     };
     setLogs(prev => [...prev.slice(-15), newLog]);
-    // Also push to the terminal overlay in index.html
-    (window as any).console.log(message);
+    // Also push to the terminal overlay in index.html if it exists
+    if ((window as any).addLog) (window as any).addLog(message, level);
   };
 
   useEffect(() => {
-    console.log("App: Component mounted. Initializing sub-systems...");
     addLog("Avionics core active.", "INFO");
     fetchPersistentLogs();
   }, []);
 
   const fetchPersistentLogs = async () => {
     try {
-      addLog("DISK: Checking for persistent log file...", "INFO");
       const res = await fetch('/api/logs');
       if (res.ok) {
         const text = await res.text();
         setPersistentLogs(text);
         addLog("DISK: Persistent logs retrieved.", "SUCCESS");
-      } else {
-        setPersistentLogs('No logs found on disk.');
-        addLog("DISK: No remote bridge log available (Static Mode).", "WARN");
       }
     } catch (e) {
-      addLog("DISK: Failed to reach bridge API (Likely running on GH Pages).", "INFO");
+      // Quiet fail if not in bridge mode
     }
   };
 
   const clearPersistentLogs = async () => {
-    if (!window.confirm("Wipe 'skyflow_avionics.log' from your computer?")) return;
+    if (!window.confirm("Delete 'skyflow_avionics.log' from your PC?")) return;
     try {
       const res = await fetch('/api/logs', { method: 'DELETE' });
       if (res.ok) {
-        addLog("DISK: Remote log file wiped.", "SUCCESS");
-        setPersistentLogs("[LOG CLEARED BY USER]");
+        addLog("DISK: Persistent file cleared.", "SUCCESS");
+        setPersistentLogs("[LOG_CLEARED_BY_USER]");
       }
     } catch (e) {
-      addLog("DISK: Could not contact bridge to wipe file.", "ERROR");
+      addLog("DISK: Could not reach bridge to clear file.", "ERROR");
     }
   };
 
   useEffect(() => {
     let reconnectTimer: any;
     const connectBridge = () => {
-      console.log("Net: Attempting bridge handshake...");
       try {
         const ws = new WebSocket('ws://localhost:8080');
         ws.onopen = () => {
@@ -119,7 +103,7 @@ const App: React.FC = () => {
         wsRef.current.send(JSON.stringify({ type: 'INJECT_WEATHER', icao: data.icao, raw: data.raw }));
         addLog(`SYNC: ${data.icao} injected to simulator`, "SUCCESS");
       } else {
-        addLog(`PREVIEW: ${data.icao} loaded in static preview mode.`, "SUCCESS");
+        addLog(`PREVIEW: ${data.icao} loaded.`, "SUCCESS");
       }
     } catch (error: any) {
       addLog(`FAULT: ${error.message}`, 'ERROR');
@@ -168,15 +152,12 @@ const App: React.FC = () => {
             </div>
             
             <div className="bg-black/90 p-5 rounded-2xl border border-slate-800/50 font-mono text-[10px]">
-              <div className="flex items-center justify-between mb-4 border-b border-slate-800/50 pb-2">
-                 <p className="font-black uppercase flex items-center gap-2 text-slate-400">
-                    <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>
-                    Operational Log Stream
-                 </p>
-                 <button onClick={fetchPersistentLogs} className="text-[8px] text-sky-500 font-black hover:text-white transition-colors">REFRESH DISK LOGS</button>
-              </div>
+              <p className="font-black uppercase flex items-center gap-2 text-slate-400 mb-4 border-b border-slate-800/50 pb-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>
+                Operational Stream
+              </p>
               <div className="space-y-1 overflow-y-auto max-h-48">
-                {logs.length === 0 ? <p className="opacity-30">Awaiting system events...</p> : logs.map(l => (
+                {logs.map(l => (
                   <div key={l.id} className="flex gap-4">
                     <span className="opacity-20 text-white">[{l.timestamp}]</span>
                     <span className={l.level === 'SUCCESS' ? 'text-green-500' : l.level === 'ERROR' ? 'text-red-500' : l.level === 'WARN' ? 'text-yellow-500' : 'text-sky-400'}>{l.message}</span>
@@ -192,17 +173,17 @@ const App: React.FC = () => {
           <div className="max-w-2xl mx-auto space-y-8 pb-20">
             <div className="bg-slate-900 p-10 rounded-[40px] border border-slate-800 shadow-2xl space-y-8">
               <div className="flex justify-between items-center">
-                <h2 className="text-3xl font-black italic">Persistent Disk Log</h2>
+                <h2 className="text-3xl font-black italic">Persistent PC Logs</h2>
                 <div className="flex gap-2">
-                  <button onClick={fetchPersistentLogs} className="bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors">Reload</button>
-                  <button onClick={clearPersistentLogs} className="bg-red-950/40 text-red-500 border border-red-900/50 hover:bg-red-600 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Clear Log File</button>
+                  <button onClick={fetchPersistentLogs} className="bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest">Reload</button>
+                  <button onClick={clearPersistentLogs} className="bg-red-950/40 text-red-500 border border-red-900/50 hover:bg-red-600 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Wipe File</button>
                 </div>
               </div>
-              <div className="bg-black/80 p-6 rounded-3xl border border-slate-800 font-mono text-[11px] h-96 overflow-y-auto whitespace-pre text-slate-400 border-l-4 border-l-sky-500/30">
-                {persistentLogs || 'Log file is unreachable in static preview mode. Run bridge.js locally to enable file logging.'}
+              <div className="bg-black/80 p-6 rounded-3xl border border-slate-800 font-mono text-[11px] h-96 overflow-y-auto whitespace-pre text-slate-400">
+                {persistentLogs || 'Connect to bridge.js to view persistent file logs.'}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[9px] font-bold text-slate-600 uppercase tracking-widest text-center">
-                <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">Auto-Purge Cycle: 30 Days</div>
+                <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">Retention: 30 Days</div>
                 <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">Path: ./skyflow_avionics.log</div>
               </div>
             </div>
@@ -246,7 +227,7 @@ const App: React.FC = () => {
             </button>
           ))}
           <div className="mt-auto p-4 border-t border-slate-800/50 text-center opacity-30">
-             <p className="text-[7px] text-slate-400 uppercase font-black tracking-[0.3em]">Build 2.11-RESILIENT</p>
+             <p className="text-[7px] text-slate-400 uppercase font-black tracking-[0.3em]">Build 2.12-DIAG</p>
           </div>
         </aside>
 

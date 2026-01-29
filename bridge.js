@@ -1,6 +1,6 @@
 /**
- * SKYFLOW CORE ENGINE v2.11
- * Robust Bridge for FSX/P3D with Persistent Logging
+ * SKYFLOW CORE ENGINE v2.12
+ * Robust Bridge for FSX/P3D with Persistent Logging & 30-Day Auto-Purge
  */
 
 const WebSocket = require('ws');
@@ -24,27 +24,29 @@ function writeLog(message, level = 'INFO') {
   }
 }
 
-// 30-Day Auto-Purge Logic
+// 30-Day Auto-Purge Logic (Clear if older than 30 days)
 function checkLogRotation() {
   if (fs.existsSync(LOG_FILE)) {
     try {
       const stats = fs.statSync(LOG_FILE);
       const now = new Date().getTime();
       const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
+      
       if (now - stats.birthtimeMs > thirtyDaysInMs) {
-        fs.writeFileSync(LOG_FILE, `[SYSTEM] Log automatically rotated after 30 days.\n`);
+        fs.unlinkSync(LOG_FILE);
+        fs.writeFileSync(LOG_FILE, `[SYSTEM] Log cleared automatically after 30 days of retention.\n`);
         console.log('SKYFLOW: 30-day log rotation executed.');
       }
     } catch (e) {
       writeLog('Log rotation check failed: ' + e.message, 'WARN');
     }
   } else {
-    fs.writeFileSync(LOG_FILE, `[SYSTEM] Log initialized.\n`);
+    fs.writeFileSync(LOG_FILE, `[SYSTEM] Log initialized at ${new Date().toISOString()}\n`);
   }
 }
 
 checkLogRotation();
-writeLog('SkyFlow Bridge Initializing...');
+writeLog('SkyFlow Bridge Booting...');
 
 // --- SERVER SETUP ---
 app.use((req, res, next) => {
@@ -65,14 +67,14 @@ app.get('/api/logs', (req, res) => {
   }
 });
 
-// Clear Logs (View and Delete)
+// Clear Logs manually
 app.delete('/api/logs', (req, res) => {
   try {
-    fs.writeFileSync(LOG_FILE, `[SYSTEM] Log cleared by user at ${new Date().toISOString()}.\n`);
-    writeLog('Persistent log file wiped by user request.', 'SUCCESS');
-    res.status(200).send('Log cleared.');
+    fs.writeFileSync(LOG_FILE, `[SYSTEM] User manually cleared logs on ${new Date().toISOString()}\n`);
+    writeLog('Persistent log file cleared by user command.', 'SUCCESS');
+    res.status(200).send('OK');
   } catch (err) {
-    res.status(500).send('Failed to clear log: ' + err.message);
+    res.status(500).send(err.message);
   }
 });
 
