@@ -27,7 +27,6 @@
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
     <script>
-      // Ensure process.env is defined for the browser environment
       window.process = window.process || { env: {} };
       
       function logToHUD(msg, type = 'INFO') {
@@ -39,12 +38,10 @@
           hud.appendChild(div);
           hud.parentElement.scrollTop = hud.parentElement.scrollHeight;
         }
-        console.log(`[${type}] ${msg}`);
       }
 
       window.onerror = (e) => logToHUD("CRITICAL_FAULT: " + e, 'ERROR');
       window.onunhandledrejection = (e) => logToHUD("ASYNC_FAULT: " + e.reason, 'ERROR');
-
       window.addLog = (m, t) => logToHUD(m, t);
     </script>
     <script type="importmap">
@@ -77,7 +74,6 @@
 
     <div id="root"></div>
 
-    <!-- We load index.tsx as a single entry point to avoid relative path issues in browser previews -->
     <script type="text/babel" data-type="module" data-presets="typescript,react" src="./index.tsx"></script>
 </body>
 </html>

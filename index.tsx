@@ -2,10 +2,52 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { GoogleGenAI, Type } from "@google/genai";
 import * as d3 from 'd3';
-import { MetarData, NavigationTab, LogEntry } from './types';
-import { SCENARIOS, FSX_AIRCRAFT } from './constants';
 
-// --- Services (Inline for reliability) ---
+// --- TYPES (Consolidated) ---
+export interface CloudLayer {
+  cover: 'FEW' | 'SCT' | 'BKN' | 'OVC' | 'SKC';
+  altitude: number;
+}
+
+export interface MetarData {
+  icao: string;
+  raw: string;
+  timestamp: string;
+  temperature: number;
+  dewpoint: number;
+  windDirection: number;
+  windSpeed: number;
+  visibility: string;
+  altimeter: string;
+  clouds: CloudLayer[];
+  conditions?: string;
+}
+
+export interface LogEntry {
+  id: string;
+  timestamp: string;
+  level: 'INFO' | 'WARN' | 'ERROR' | 'SUCCESS';
+  message: string;
+}
+
+export enum NavigationTab {
+  DASHBOARD = 'Dashboard',
+  PLANNER = 'Flight Planner',
+  BRIEFING = 'Briefing',
+  SCENARIOS = 'Historical Scenarios',
+  SETTINGS = 'System Settings'
+}
+
+// --- CONSTANTS (Consolidated) ---
+const FSX_AIRCRAFT = [
+  "Boeing 737-800",
+  "Cessna C172SP Skyhawk",
+  "Beechcraft King Air 350",
+  "Learjet 45",
+  "Airbus A321"
+];
+
+// --- SERVICES ---
 const fetchMetarData = async (icao: string): Promise<MetarData> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
   const response = await ai.models.generateContent({
@@ -46,39 +88,39 @@ const fetchMetarData = async (icao: string): Promise<MetarData> => {
   return JSON.parse(text.trim());
 };
 
-// --- Components (Inline for reliability) ---
+// --- COMPONENTS ---
 const MetarDisplay: React.FC<{ data: MetarData }> = ({ data }) => (
   <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6 font-mono text-sm shadow-xl">
     <div className="flex justify-between items-center mb-4 border-b border-slate-700/50 pb-3">
       <span className="text-sky-400 font-black text-xl italic">{data.icao}</span>
       <span className="text-slate-500 text-[10px] font-bold uppercase">{data.timestamp || 'REAL-TIME'}</span>
     </div>
-    <div className="text-sky-100 mb-6 bg-black/40 p-4 rounded-xl border border-slate-700/30 break-all leading-relaxed">
+    <div className="text-sky-100 mb-6 bg-black/40 p-4 rounded-xl border border-slate-700/30 break-all leading-relaxed text-xs">
       {data.raw}
     </div>
-    <div className="grid grid-cols-2 gap-6">
+    <div className="grid grid-cols-2 gap-4">
       <div className="flex flex-col">
-        <span className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-1">Wind</span>
-        <span className="text-slate-200 font-bold">{data.windDirection}° @ {data.windSpeed}KT</span>
+        <span className="text-[8px] text-slate-500 uppercase font-black tracking-widest mb-1">Wind</span>
+        <span className="text-slate-200 font-bold text-xs">{data.windDirection}° @ {data.windSpeed}KT</span>
       </div>
       <div className="flex flex-col">
-        <span className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-1">Visibility</span>
-        <span className="text-slate-200 font-bold">{data.visibility}</span>
+        <span className="text-[8px] text-slate-500 uppercase font-black tracking-widest mb-1">Visibility</span>
+        <span className="text-slate-200 font-bold text-xs">{data.visibility}</span>
       </div>
       <div className="flex flex-col">
-        <span className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-1">Temp / Dew</span>
-        <span className="text-slate-200 font-bold">{data.temperature}°C / {data.dewpoint}°C</span>
+        <span className="text-[8px] text-slate-500 uppercase font-black tracking-widest mb-1">Temp / Dew</span>
+        <span className="text-slate-200 font-bold text-xs">{data.temperature}°C / {data.dewpoint}°C</span>
       </div>
       <div className="flex flex-col">
-        <span className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-1">Altimeter</span>
-        <span className="text-slate-200 font-bold">{data.altimeter}</span>
+        <span className="text-[8px] text-slate-500 uppercase font-black tracking-widest mb-1">Altimeter</span>
+        <span className="text-slate-200 font-bold text-xs">{data.altimeter}</span>
       </div>
     </div>
     <div className="mt-6 pt-4 border-t border-slate-700/30">
-      <span className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-2 block">Atmospheric Layers</span>
+      <span className="text-[8px] text-slate-500 uppercase font-black tracking-widest mb-2 block">Atmospheric Layers</span>
       <div className="flex flex-wrap gap-2 mt-1">
         {data.clouds.map((c, i) => (
-          <span key={i} className="bg-sky-500/10 px-3 py-1.5 rounded-lg text-[10px] font-black text-sky-400 border border-sky-500/20 uppercase">
+          <span key={i} className="bg-sky-500/10 px-2 py-1 rounded-lg text-[9px] font-black text-sky-400 border border-sky-500/20 uppercase">
             {c.cover} @ {c.altitude} FT
           </span>
         ))}
@@ -148,10 +190,10 @@ const RadarView: React.FC<{ metar: MetarData }> = ({ metar }) => {
     <div className="flex flex-col items-center justify-center p-6 bg-slate-900/80 border border-slate-800 rounded-[32px] overflow-hidden relative shadow-inner h-full">
       <div className="absolute top-6 left-6 flex items-center gap-2">
         <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-        <span className="text-[10px] font-mono text-green-500 uppercase tracking-[0.2em] font-black">RADAR_SWEEP_ACTIVE</span>
+        <span className="text-[8px] font-mono text-green-500 uppercase tracking-[0.2em] font-black">RADAR_SWEEP_ACTIVE</span>
       </div>
-      <svg ref={svgRef} viewBox="0 0 400 400" className="w-full h-auto max-w-[320px]" />
-      <div className="mt-6 grid grid-cols-2 gap-8 w-full text-[10px] font-mono text-slate-500 font-bold uppercase tracking-widest">
+      <svg ref={svgRef} viewBox="0 0 400 400" className="w-full h-auto max-w-[280px]" />
+      <div className="mt-4 grid grid-cols-2 gap-8 w-full text-[9px] font-mono text-slate-500 font-bold uppercase tracking-widest">
         <div>RANGE: 40NM</div>
         <div className="text-right">TILT: +1.5°</div>
       </div>
@@ -159,7 +201,7 @@ const RadarView: React.FC<{ metar: MetarData }> = ({ metar }) => {
   );
 };
 
-// --- App Root ---
+// --- APP ROOT ---
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavigationTab>(NavigationTab.DASHBOARD);
   const [loading, setLoading] = useState(false);
@@ -175,7 +217,7 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    addLog("Initializing Atmospheric Core...", "INFO");
+    addLog("Initializing Kernel...", "INFO");
     let reconnectTimer: any;
     const connectBridge = () => {
       try {
@@ -248,77 +290,63 @@ const App: React.FC = () => {
       </header>
 
       <div className="flex flex-1 overflow-hidden pb-[120px]">
-        <aside className="w-64 bg-[#0a0f17] border-r border-slate-800 p-6 flex flex-col gap-1 shrink-0">
+        <aside className="w-56 bg-[#0a0f17] border-r border-slate-800 p-6 flex flex-col gap-1 shrink-0">
           {Object.values(NavigationTab).map(tab => (
             <button 
               key={tab} 
               onClick={() => setActiveTab(tab)} 
-              className={`w-full text-left px-5 py-3.5 rounded-2xl font-black text-[9px] uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-sky-600 text-white shadow-lg shadow-sky-900/20' : 'text-slate-600 hover:bg-slate-800 hover:text-slate-300'}`}
+              className={`w-full text-left px-5 py-3 rounded-xl font-black text-[8px] uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-sky-600 text-white shadow-lg' : 'text-slate-600 hover:bg-slate-800'}`}
             >
               {tab}
             </button>
           ))}
-          {!isBridgeActive && (
-              <div className="mt-8 p-4 bg-orange-950/20 border border-orange-900/30 rounded-2xl">
-                  <p className="text-[8px] font-black text-orange-500 uppercase tracking-widest mb-2">Bridge Required</p>
-                  <p className="text-[7px] text-orange-200/50 uppercase font-bold leading-relaxed">
-                    Start 'bridge.js' on your flight simulator PC.
-                  </p>
-              </div>
-          )}
         </aside>
 
-        <main className="flex-1 overflow-y-auto p-12">
-          <div className="max-w-5xl mx-auto space-y-8">
-            <div className="bg-slate-900/60 p-10 rounded-[40px] border border-slate-800/50 flex flex-col md:flex-row items-center justify-between gap-8 shadow-2xl backdrop-blur-md">
+        <main className="flex-1 overflow-y-auto p-8">
+          <div className="max-w-4xl mx-auto space-y-8">
+            <div className="bg-slate-900/60 p-8 rounded-[32px] border border-slate-800/50 flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl backdrop-blur-md">
               <div className="text-center md:text-left">
-                <h2 className="text-4xl font-black uppercase tracking-tighter text-white italic leading-tight">Atmospheric<br/>Injection Core</h2>
-                <p className="text-slate-500 text-[10px] font-bold tracking-[0.3em] mt-2 uppercase">Direct SimConnect Uplink</p>
+                <h2 className="text-3xl font-black uppercase tracking-tighter text-white italic leading-tight">Injection Core</h2>
+                <p className="text-slate-500 text-[8px] font-bold tracking-[0.3em] mt-1 uppercase">Direct SimConnect Uplink</p>
               </div>
-              <div className="flex gap-4 p-2 bg-black/40 rounded-3xl border border-slate-800/50">
+              <div className="flex gap-3 p-2 bg-black/40 rounded-2xl border border-slate-800/50">
                 <input 
                   type="text" 
                   maxLength={4} 
                   value={stationQuery} 
                   onChange={e => setStationQuery(e.target.value.toUpperCase())} 
-                  className="w-24 bg-transparent p-4 text-3xl font-black text-center text-sky-400 outline-none uppercase italic" 
+                  className="w-20 bg-transparent p-3 text-2xl font-black text-center text-sky-400 outline-none uppercase italic" 
                   placeholder="ICAO"
                 />
                 <button 
                   onClick={() => handleInject()} 
                   disabled={loading} 
-                  className={`px-10 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all ${loading ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-sky-600 hover:bg-sky-500 text-white shadow-xl shadow-sky-900/40 active:scale-95'}`}
+                  className={`px-6 rounded-xl font-black uppercase tracking-widest text-[9px] transition-all ${loading ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-sky-600 hover:bg-sky-500 text-white shadow-xl shadow-sky-900/40'}`}
                 >
                   {loading ? 'UPLOADING...' : 'SYNC WEATHER'}
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
               <div className="space-y-4">
-                <label className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-700 ml-4 flex items-center gap-2">
-                   <span className="w-1 h-1 bg-sky-500 rounded-full"></span> Telemetry Display
+                <label className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-700 ml-4 flex items-center gap-2">
+                   <span className="w-1 h-1 bg-sky-500 rounded-full"></span> Telemetry
                 </label>
                 {currentMetar ? <MetarDisplay data={currentMetar} /> : (
-                  <div className="h-full min-h-[300px] border-2 border-dashed border-slate-800/50 rounded-[32px] flex flex-col items-center justify-center text-slate-800 p-8 text-center bg-slate-900/10">
-                    <div className="w-12 h-12 border-2 border-slate-800 rounded-full mb-4 opacity-50"></div>
-                    <span className="font-black uppercase tracking-[0.2em] text-[10px]">System Standby</span>
-                    <p className="text-[9px] text-slate-700 mt-2 uppercase font-bold">Awaiting station telemetry synchronization</p>
+                  <div className="h-full min-h-[250px] border border-slate-800/50 rounded-[24px] flex flex-col items-center justify-center text-slate-800 p-8 text-center bg-slate-900/10">
+                    <span className="font-black uppercase tracking-[0.2em] text-[8px]">System Standby</span>
                   </div>
                 )}
               </div>
               <div className="space-y-4">
-                <label className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-700 ml-4 flex items-center gap-2">
-                   <span className="w-1 h-1 bg-green-500 rounded-full"></span> Tactical Radar
+                <label className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-700 ml-4 flex items-center gap-2">
+                   <span className="w-1 h-1 bg-green-500 rounded-full"></span> Radar
                 </label>
-                <div className="h-full min-h-[400px]">
+                <div className="h-full min-h-[350px]">
                   {currentMetar ? <RadarView metar={currentMetar} /> : (
-                    <div className="h-full border-2 border-dashed border-slate-800/50 rounded-[32px] flex flex-col items-center justify-center text-slate-800 p-8 text-center bg-slate-900/10">
-                      <div className="w-20 h-20 border-2 border-slate-800 rounded-full mb-4 opacity-50 flex items-center justify-center">
-                        <div className="w-1 h-10 bg-slate-800 origin-bottom"></div>
-                      </div>
-                      <span className="font-black uppercase tracking-[0.2em] text-[10px]">Radar Offline</span>
-                      <p className="text-[9px] text-slate-700 mt-2 uppercase font-bold">Initialize uplink to activate weather sweep</p>
+                    <div className="h-full border border-slate-800/50 rounded-[24px] flex flex-col items-center justify-center text-slate-800 p-8 text-center bg-slate-900/10">
+                      <span className="font-black uppercase tracking-[0.2em] text-[8px]">Radar Offline</span>
                     </div>
                   )}
                 </div>
@@ -341,20 +369,19 @@ const HeaderBadge = ({ active, label, color = "sky" }: any) => {
     : "bg-slate-700";
 
   return (
-    <div className={`px-5 py-2 rounded-2xl border flex items-center gap-3 transition-all ${colorClass}`}>
-      <div className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
-      <span className="text-[9px] font-black uppercase tracking-widest">{label}</span>
+    <div className={`px-4 py-1.5 rounded-xl border flex items-center gap-3 transition-all ${colorClass}`}>
+      <div className={`w-1 h-1 rounded-full ${dotClass}`} />
+      <span className="text-[8px] font-black uppercase tracking-widest">{label}</span>
     </div>
   );
 };
 
-// --- Bootstrapper ---
+// --- BOOTSTRAPPER ---
 const container = document.getElementById('root');
 if (container) {
   const root = createRoot(container);
   root.render(<App />);
   
-  // Fade out splash if it exists
   const splash = document.getElementById('boot-splash');
   if (splash) {
     setTimeout(() => splash.classList.add('fade-out'), 800);
