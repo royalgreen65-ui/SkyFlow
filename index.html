@@ -18,6 +18,10 @@
         @keyframes slide { 0% { left: -40%; } 100% { left: 100%; } }
         .fade-out { opacity: 0; pointer-events: none; }
     </style>
+    <script>
+      // POLYFILL: Prevent 'process is not defined' error in deployed environments
+      window.process = window.process || { env: {} };
+    </script>
     <script type="importmap">
 {
   "imports": {
@@ -46,13 +50,31 @@
         import { createRoot } from 'react-dom/client';
         import App from './App.tsx';
 
+        // Ensure splash disappears even if React takes a second
+        window.addEventListener('load', () => {
+          setTimeout(() => {
+            const splash = document.getElementById('boot-splash');
+            if (splash) splash.classList.add('fade-out');
+          }, 1500);
+        });
+
         try {
             const container = document.getElementById('root');
-            const root = createRoot(container);
-            root.render(<App />);
+            if (container) {
+              const root = createRoot(container);
+              root.render(<App />);
+            }
         } catch (err) {
-            console.error("Mounting failed:", err);
-            document.body.innerHTML = `<div style="color: red; padding: 20px;">Startup Error: ${err.message}</div>`;
+            console.error("Critical Startup Error:", err);
+            const splash = document.getElementById('boot-splash');
+            if (splash) splash.style.display = 'none';
+            document.getElementById('root').innerHTML = `
+              <div style="padding: 40px; color: #ef4444; font-family: monospace;">
+                <h1 style="font-size: 24px; font-weight: bold;">STARTUP_FAILURE</h1>
+                <p style="margin-top: 10px;">${err.message}</p>
+                <p style="color: #64748b; font-size: 12px; margin-top: 20px;">Check browser console for full stack trace.</p>
+              </div>
+            `;
         }
     </script>
 </body>

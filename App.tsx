@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { MetarData, NavigationTab, LogEntry } from './types';
+import { MetarData, NavigationTab, LogEntry, FlightPlan } from './types';
 import { fetchMetarData } from './services/geminiService';
 import { MetarDisplay } from './components/MetarDisplay';
 import { RadarView } from './components/RadarView';
 import { XGaugeConfig } from './components/XGaugeConfig';
+import { SCENARIOS, FSX_AIRCRAFT } from './constants';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavigationTab>(NavigationTab.DASHBOARD);
@@ -14,6 +15,14 @@ const App: React.FC = () => {
   const [isSimConnected, setIsSimConnected] = useState(false);
   const [isBridgeActive, setIsBridgeActive] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [flightPlan, setFlightPlan] = useState<FlightPlan>({
+    departure: 'KLAX',
+    arrival: 'KSFO',
+    alternate: 'KSJC',
+    aircraft: 'Boeing 737-800',
+    cruiseAltitude: 36000,
+    fuelWeight: 18500
+  });
   
   const wsRef = useRef<WebSocket | null>(null);
   
@@ -27,23 +36,14 @@ const App: React.FC = () => {
     setLogs(prev => [...prev.slice(-8), newLog]);
   };
 
-  // Lifecycle: App Ready
   useEffect(() => {
-    // Dismiss Splash Screen
     const splash = document.getElementById('boot-splash');
-    if (splash) {
-      setTimeout(() => splash.classList.add('fade-out'), 500);
-    }
-
-    // Check API Health
-    if (!process.env.API_KEY) {
-      addLog("API CONFIG MISSING: Check secrets.", "ERROR");
-    } else {
-      addLog("SkyFlow Intelligence Online", "SUCCESS");
-    }
+    if (splash) splash.classList.add('fade-out');
+    const key = process.env.API_KEY;
+    if (!key) addLog("API_KEY_UNDEFINED: Injection disabled.", "ERROR");
+    else addLog("SkyFlow Intelligence Online", "SUCCESS");
   }, []);
 
-  // Lifecycle: Sim Bridge
   useEffect(() => {
     let reconnectTimer: any;
     const connectBridge = () => {
@@ -82,11 +82,10 @@ const App: React.FC = () => {
     };
   }, [isSimConnected]);
 
-  const handleInject = async () => {
-    if (!stationQuery) return;
+  const handleInject = async (icao: string = stationQuery) => {
     setLoading(true);
     try {
-      const data = await fetchMetarData(stationQuery);
+      const data = await fetchMetarData(icao);
       setCurrentMetar(data);
       if (isBridgeActive && wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: 'INJECT_WEATHER', icao: data.icao, raw: data.raw }));
@@ -111,11 +110,8 @@ const App: React.FC = () => {
             <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-1">Universal Cockpit Dashboard</p>
           </div>
         </div>
-
         <div className="flex gap-3">
-          <button onClick={() => setActiveTab(NavigationTab.SETUP)} className="group">
-            <StatusBadge active={isBridgeActive} label="Bridge" activeText="LINKED" idleText="OFFLINE" />
-          </button>
+          <StatusBadge active={isBridgeActive} label="Bridge" activeText="LINKED" idleText="OFFLINE" onClick={() => setActiveTab(NavigationTab.SETUP)} />
           <StatusBadge active={isSimConnected} label="Sim" activeText="READY" idleText="WAITING" color="green" />
         </div>
       </header>
@@ -127,16 +123,15 @@ const App: React.FC = () => {
               {tab}
             </button>
           ))}
-          
           <div className="mt-auto space-y-4">
              <div className="bg-slate-900/80 rounded-2xl p-4 border border-slate-800">
                <p className="text-[9px] font-black uppercase tracking-widest text-slate-600 mb-2">Sim Signal</p>
                <div className="flex items-center gap-2">
                  <div className={`w-2 h-2 rounded-full ${isSimConnected ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500 animate-pulse'}`}></div>
-                 <span className="text-[10px] font-bold text-slate-400">{isSimConnected ? 'SimConnect Active' : 'Waiting for FSX...'}</span>
+                 <span className="text-[10px] font-bold text-slate-400">{isSimConnected ? 'SimConnect Active' : 'Waiting...'}</span>
                </div>
              </div>
-             <p className="text-[8px] text-slate-700 uppercase tracking-widest text-center">SkyFlow Engine v2.9-PRD</p>
+             <p className="text-[8px] text-slate-700 uppercase tracking-widest text-center">Engine v2.9-PRD</p>
           </div>
         </aside>
 
@@ -146,31 +141,15 @@ const App: React.FC = () => {
               <div className="bg-slate-900/60 p-10 rounded-[48px] border border-slate-800/50 shadow-2xl flex items-center justify-between gap-10">
                 <div className="flex-1">
                   <h2 className="text-4xl font-black uppercase tracking-tighter text-white italic">Weather Injection</h2>
-                  <p className="text-slate-500 text-sm mt-2">Generate hyper-realistic weather via AI and sync it instantly to your cockpit.</p>
+                  <p className="text-slate-500 text-sm mt-2">Generate hyper-realistic weather and sync it instantly.</p>
                 </div>
                 <div className="flex gap-4">
-                  <input type="text" maxLength={4} value={stationQuery} onChange={e => setStationQuery(e.target.value.toUpperCase())} className="w-36 bg-black border-2 border-slate-800 rounded-3xl p-5 text-3xl font-black text-center text-white outline-none focus:border-sky-500 transition-all uppercase placeholder:text-slate-900" placeholder="KLAX" />
-                  <button onClick={handleInject} disabled={loading} className={`px-10 rounded-3xl font-black uppercase tracking-widest text-[11px] transition-all ${loading ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-sky-600 hover:bg-sky-500 text-white shadow-xl shadow-sky-900/30 active:scale-95'}`}>
+                  <input type="text" maxLength={4} value={stationQuery} onChange={e => setStationQuery(e.target.value.toUpperCase())} className="w-36 bg-black border-2 border-slate-800 rounded-3xl p-5 text-3xl font-black text-center text-white outline-none focus:border-sky-500 transition-all uppercase" placeholder="KLAX" />
+                  <button onClick={() => handleInject()} disabled={loading} className={`px-10 rounded-3xl font-black uppercase tracking-widest text-[11px] transition-all ${loading ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-sky-600 hover:bg-sky-500 text-white shadow-xl shadow-sky-900/30'}`}>
                     {loading ? 'SYNCING...' : 'FETCH & INJECT'}
                   </button>
                 </div>
               </div>
-
-              {!isBridgeActive && (
-                <div className="bg-red-500/10 border border-red-500/20 p-8 rounded-[40px] flex items-center justify-between">
-                  <div className="flex items-center gap-6">
-                    <div className="w-14 h-14 bg-red-500/20 rounded-2xl flex items-center justify-center text-red-500">
-                      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                    </div>
-                    <div>
-                      <p className="text-red-400 font-black uppercase tracking-[0.2em] text-[10px]">Critical Link Missing</p>
-                      <h3 className="text-lg font-bold text-white">Bridge.exe is not detected</h3>
-                      <p className="text-slate-500 text-sm">Download and start the bridge component to enable weather injection.</p>
-                    </div>
-                  </div>
-                  <button onClick={() => setActiveTab(NavigationTab.SETUP)} className="px-8 py-3 bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 rounded-2xl text-red-400 font-black text-[11px] uppercase tracking-widest transition-all">Download Bridge</button>
-                </div>
-              )}
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="space-y-4">
@@ -189,95 +168,201 @@ const App: React.FC = () => {
                   System Stream
                 </p>
                 <div className="space-y-1">
-                  {logs.length === 0 ? <div className="opacity-30">Listening for engine heartbeats...</div> : logs.map(l => (
-                    <div key={l.id} className="py-0.5 border-b border-slate-800/10 last:border-0">
-                      <span className="opacity-40">[{l.timestamp}]</span> <span className={l.level === 'SUCCESS' ? 'text-green-500' : l.level === 'ERROR' ? 'text-red-500' : 'text-sky-400'}>{l.message}</span>
-                    </div>
+                  {logs.length === 0 ? <div className="opacity-30">Listening for heartbeats...</div> : logs.map(l => (
+                    <div key={l.id} className="py-0.5"><span className="opacity-40">[{l.timestamp}]</span> <span className={l.level === 'SUCCESS' ? 'text-green-500' : l.level === 'ERROR' ? 'text-red-500' : 'text-sky-400'}>{l.message}</span></div>
                   ))}
                 </div>
               </div>
             </div>
           )}
 
+          {activeTab === NavigationTab.PLANNER && (
+            <div className="max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+               <div className="bg-slate-900/60 p-12 rounded-[48px] border border-slate-800/50 shadow-2xl space-y-10">
+                 <h2 className="text-4xl font-black uppercase tracking-tighter text-white italic">Flight Dispatch</h2>
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-2">Departure</label>
+                      <input type="text" value={flightPlan.departure} onChange={e => setFlightPlan({...flightPlan, departure: e.target.value.toUpperCase()})} className="w-full bg-black border border-slate-800 rounded-2xl p-4 font-black text-xl text-sky-400 outline-none focus:border-sky-600" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-2">Arrival</label>
+                      <input type="text" value={flightPlan.arrival} onChange={e => setFlightPlan({...flightPlan, arrival: e.target.value.toUpperCase()})} className="w-full bg-black border border-slate-800 rounded-2xl p-4 font-black text-xl text-sky-400 outline-none focus:border-sky-600" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-2">Alternate</label>
+                      <input type="text" value={flightPlan.alternate} onChange={e => setFlightPlan({...flightPlan, alternate: e.target.value.toUpperCase()})} className="w-full bg-black border border-slate-800 rounded-2xl p-4 font-black text-xl text-slate-400 outline-none focus:border-sky-600" />
+                    </div>
+                 </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-2">Aircraft Frame</label>
+                      <select value={flightPlan.aircraft} onChange={e => setFlightPlan({...flightPlan, aircraft: e.target.value})} className="w-full bg-black border border-slate-800 rounded-2xl p-4 font-black text-lg text-white appearance-none cursor-pointer outline-none focus:border-sky-600">
+                        {FSX_AIRCRAFT.map(ac => <option key={ac} value={ac}>{ac}</option>)}
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-2">Cruise (FL)</label>
+                        <input type="number" value={flightPlan.cruiseAltitude} onChange={e => setFlightPlan({...flightPlan, cruiseAltitude: parseInt(e.target.value)})} className="w-full bg-black border border-slate-800 rounded-2xl p-4 font-black text-lg text-white outline-none" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-2">Fuel (LB)</label>
+                        <input type="number" value={flightPlan.fuelWeight} onChange={e => setFlightPlan({...flightPlan, fuelWeight: parseInt(e.target.value)})} className="w-full bg-black border border-slate-800 rounded-2xl p-4 font-black text-lg text-white outline-none" />
+                      </div>
+                    </div>
+                 </div>
+                 <button onClick={() => { addLog("Flight Plan Compiled", "SUCCESS"); setActiveTab(NavigationTab.BRIEFING); }} className="w-full bg-sky-600 hover:bg-sky-500 py-6 rounded-3xl font-black uppercase tracking-[0.2em] text-sm shadow-2xl transition-all active:scale-95">Generate Flight Briefing</button>
+               </div>
+            </div>
+          )}
+
+          {activeTab === NavigationTab.SCENARIOS && (
+             <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="text-center">
+                  <h2 className="text-5xl font-black uppercase tracking-tighter text-white italic">Historical Scenarios</h2>
+                  <p className="text-slate-500 text-sm mt-4 font-bold tracking-widest uppercase">Experience real-world aviation challenges in your simulator</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+                  {SCENARIOS.map(s => (
+                    <div key={s.id} className="bg-slate-900/40 border border-slate-800 rounded-[40px] overflow-hidden group hover:border-sky-500/50 transition-all shadow-xl">
+                      <div className="h-48 relative">
+                        <img src={s.imageUrl} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-all duration-700" alt={s.title} />
+                        <div className="absolute top-4 right-4 bg-red-600 text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest">{s.severity}</div>
+                      </div>
+                      <div className="p-8 space-y-4">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-xl font-black italic">{s.title}</h3>
+                          <span className="text-sky-500 font-bold text-xs">{s.icao}</span>
+                        </div>
+                        <p className="text-slate-400 text-sm leading-relaxed h-20 overflow-hidden line-clamp-3">{s.description}</p>
+                        <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
+                          <span className="text-[10px] text-slate-500 font-bold uppercase">{s.date}</span>
+                          <button onClick={() => handleInject(s.icao)} className="px-6 py-2 bg-slate-800 hover:bg-sky-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all">Re-live Weather</button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+             </div>
+          )}
+
+          {activeTab === NavigationTab.BRIEFING && (
+            <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+               <div className="bg-slate-900 border border-slate-800 p-12 rounded-[48px] space-y-8">
+                 <div className="flex justify-between items-start">
+                    <div>
+                      <h2 className="text-4xl font-black italic">Mission Briefing</h2>
+                      <p className="text-slate-500 font-bold tracking-widest uppercase text-[10px] mt-1">Operational Summary for {flightPlan.departure} » {flightPlan.arrival}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sky-400 font-black text-2xl uppercase tracking-tighter">Clear for Takeoff</p>
+                      <p className="text-slate-600 text-[9px] font-bold uppercase">Status Updated: Just Now</p>
+                    </div>
+                 </div>
+                 
+                 <div className="grid grid-cols-3 gap-6">
+                    <BriefItem label="Route Risk" value="MODERATE" color="yellow" />
+                    <BriefItem label="Fuel Req" value={`${flightPlan.fuelWeight} LBS`} color="sky" />
+                    <BriefItem label="ETA (Est)" value="01:45 HRS" color="slate" />
+                 </div>
+
+                 <div className="space-y-4 pt-8 border-t border-slate-800">
+                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Meteorological Advisory</h3>
+                    <div className="bg-black/40 p-6 rounded-3xl border border-slate-800/50 space-y-4">
+                      <p className="text-slate-400 text-sm leading-relaxed">
+                        Expected cruise at FL{flightPlan.cruiseAltitude / 100} with light turbulence over the Rockies. {currentMetar ? `Current conditions at ${currentMetar.icao} report ${currentMetar.windSpeed}KT winds.` : 'Departure weather is currently clear.'}
+                      </p>
+                      <div className="flex gap-3">
+                         <span className="px-3 py-1 bg-green-500/10 text-green-500 text-[9px] font-black rounded-lg border border-green-500/20">NO ICING RISK</span>
+                         <span className="px-3 py-1 bg-yellow-500/10 text-yellow-500 text-[9px] font-black rounded-lg border border-yellow-500/20">WIND SHEAR ALERT</span>
+                      </div>
+                    </div>
+                 </div>
+               </div>
+            </div>
+          )}
+
+          {activeTab === NavigationTab.XGAUGE && <XGaugeConfig />}
+
           {activeTab === NavigationTab.SETUP && (
             <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
               <div className="text-center space-y-4">
                 <h2 className="text-5xl font-black uppercase tracking-tighter text-white italic">FSX Readiness Center</h2>
-                <p className="text-slate-500 max-w-xl mx-auto uppercase tracking-widest text-[10px] font-bold">Follow these steps to link your browser to your Simulator folder</p>
+                <p className="text-slate-500 max-w-xl mx-auto uppercase tracking-widest text-[10px] font-bold">Follow these steps to link your simulator</p>
               </div>
-
               <div className="grid gap-8">
-                <SetupStep 
-                  number="1" 
-                  title="Acquire Bridge Terminal" 
-                  desc="To talk to FSX, you need the bridge.exe file from your SkyFlow installation folder."
-                  completed={isBridgeActive}
-                  action={<button className="bg-sky-600 hover:bg-sky-500 text-white font-black text-[10px] uppercase tracking-widest px-6 py-3 rounded-xl shadow-lg transition-all">Download skyflow-bridge.exe</button>}
-                />
-                
-                <SetupStep 
-                  number="2" 
-                  title="Move to Simulator Directory" 
-                  desc="Drag 'skyflow-bridge.exe' into your main Flight Simulator folder. This is critical so it can access SimConnect.dll."
-                  completed={isBridgeActive}
-                  status="Location: C:\Program Files (x86)\Microsoft Games\Microsoft Flight Simulator X"
-                />
-
-                <SetupStep 
-                  number="3" 
-                  title="Launch Engine" 
-                  desc="Double-click skyflow-bridge.exe. A terminal window will open. If successful, the 'BRIDGE' status above will turn LINKED."
-                  completed={isBridgeActive}
-                  status={isBridgeActive ? "Engine Operational" : "Waiting for Startup..."}
-                />
-
-                <SetupStep 
-                  number="4" 
-                  title="Connect Simulator" 
-                  desc="Launch your Flight Simulator and start a flight. SkyFlow will automatically detect the active SimConnect session."
-                  completed={isSimConnected}
-                  status={isSimConnected ? "FSX Linked & Synchronized" : "Searching for SimConnect..."}
-                />
+                <SetupStep number="1" title="Acquire Bridge Terminal" desc="Download the bridge.exe file from your installation source." completed={isBridgeActive} action={<button className="bg-sky-600 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest">Download Bridge</button>} />
+                <SetupStep number="2" title="Directory Placement" desc="Place bridge.exe into your Flight Simulator root folder." completed={isBridgeActive} />
+                <SetupStep number="3" title="Engine Start" desc="Run bridge.exe and start your simulator session." completed={isSimConnected} />
               </div>
-
-              <div className="bg-slate-900 border border-slate-800 p-10 rounded-[48px] text-center space-y-6">
-                <div className="w-16 h-16 bg-sky-600/20 rounded-full flex items-center justify-center text-sky-500 mx-auto">
-                   <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                </div>
-                <div>
-                  <p className="text-white font-black uppercase tracking-[0.2em] text-sm">System Verification Complete</p>
-                  <p className="text-slate-500 text-sm max-w-lg mx-auto mt-2">The API is active using the pre-configured system key. No manual key entry is required.</p>
-                </div>
+              <div className="bg-slate-900 border border-slate-800 p-10 rounded-[48px] text-center">
                 <button onClick={() => setActiveTab(NavigationTab.DASHBOARD)} className="px-12 py-5 bg-sky-600 hover:bg-sky-500 text-white font-black rounded-3xl uppercase tracking-widest text-xs transition-all shadow-2xl shadow-sky-900/40">Open Dashboard</button>
               </div>
             </div>
           )}
 
-          {activeTab === NavigationTab.XGAUGE && <XGaugeConfig />}
+          {activeTab === NavigationTab.SETTINGS && (
+             <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+               <div className="bg-slate-900/60 p-12 rounded-[48px] border border-slate-800/50 shadow-2xl space-y-12">
+                 <h2 className="text-4xl font-black uppercase tracking-tighter text-white italic">Engine Config</h2>
+                 <div className="grid gap-10">
+                    <SettingsToggle label="Global Weather Smoothing" desc="Prevents sudden pressure jumps in FSX during new injections." active />
+                    <SettingsToggle label="Dynamic Thermal Generation" desc="Simulates AI-driven updrafts based on local terrain data." active />
+                    <div className="flex items-center justify-between p-6 bg-black/40 rounded-3xl border border-slate-800">
+                       <div>
+                         <p className="font-black text-sm uppercase tracking-tight">Barometric Units</p>
+                         <p className="text-slate-500 text-xs">Choose between Mercury (InHg) or Hectopascals (hPa).</p>
+                       </div>
+                       <div className="flex gap-2 bg-slate-800 p-1 rounded-xl">
+                          <button className="px-4 py-2 bg-sky-600 text-white text-[10px] font-black rounded-lg uppercase tracking-widest">InHg</button>
+                          <button className="px-4 py-2 text-slate-500 text-[10px] font-black rounded-lg uppercase tracking-widest">hPa</button>
+                       </div>
+                    </div>
+                 </div>
+               </div>
+             </div>
+          )}
         </main>
       </div>
     </div>
   );
 };
 
-const SetupStep = ({ number, title, desc, completed, action, status }: any) => (
-  <div className={`p-10 rounded-[40px] border transition-all flex items-start gap-10 ${completed ? 'bg-green-500/5 border-green-500/20' : 'bg-slate-900/40 border-slate-800 shadow-xl'}`}>
-    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black shrink-0 text-xl ${completed ? 'bg-green-500 text-white' : 'bg-slate-800 text-slate-500'}`}>
-      {completed ? '✓' : number}
-    </div>
-    <div className="flex-1 space-y-3">
+const StatusBadge = ({ active, label, activeText, idleText, color = "sky", onClick }: any) => (
+  <button onClick={onClick} className={`px-4 py-2 rounded-xl border flex items-center gap-3 transition-all ${active ? `bg-${color}-500/10 border-${color}-500/30 text-${color}-400` : 'bg-slate-800/50 border-slate-700 text-slate-600'}`}>
+    <div className={`w-2.5 h-2.5 rounded-full ${active ? `bg-${color}-400 animate-pulse` : 'bg-slate-700'}`} />
+    <span className="text-[10px] font-black uppercase tracking-[0.1em]">{label}: {active ? activeText : idleText}</span>
+  </button>
+);
+
+const SetupStep = ({ number, title, desc, completed, action }: any) => (
+  <div className={`p-8 rounded-[40px] border flex gap-10 ${completed ? 'bg-green-500/5 border-green-500/20' : 'bg-slate-900/40 border-slate-800'}`}>
+    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black shrink-0 text-xl ${completed ? 'bg-green-500 text-white' : 'bg-slate-800 text-slate-500'}`}>{completed ? '✓' : number}</div>
+    <div className="flex-1 space-y-2">
       <h3 className={`text-xl font-black uppercase tracking-tight ${completed ? 'text-green-400' : 'text-white'}`}>{title}</h3>
-      <p className="text-slate-400 text-base leading-relaxed max-w-2xl">{desc}</p>
-      {status && <p className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border inline-block ${completed ? 'bg-green-500/10 border-green-500/20 text-green-500' : 'bg-slate-800 border-slate-700 text-slate-600'}`}>{status}</p>}
+      <p className="text-slate-400 text-sm leading-relaxed">{desc}</p>
     </div>
-    {action && <div className="shrink-0 pt-2">{action}</div>}
+    {action}
   </div>
 );
 
-const StatusBadge = ({ active, label, activeText, idleText, color = "sky" }) => (
-  <div className={`px-4 py-2 rounded-xl border flex items-center gap-3 transition-all ${active ? `bg-${color}-500/10 border-${color}-500/30 text-${color}-400` : 'bg-slate-800/50 border-slate-700 text-slate-600'}`}>
-    <div className={`w-2.5 h-2.5 rounded-full ${active ? `bg-${color}-400 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)]` : 'bg-slate-700'}`} />
-    <span className="text-[10px] font-black uppercase tracking-[0.1em] whitespace-nowrap">{label}: {active ? activeText : idleText}</span>
+const BriefItem = ({ label, value, color }: any) => (
+  <div className={`p-6 bg-slate-800/30 border border-slate-700/50 rounded-3xl text-center`}>
+    <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">{label}</p>
+    <p className={`text-xl font-black text-${color}-400 italic`}>{value}</p>
+  </div>
+);
+
+const SettingsToggle = ({ label, desc, active }: any) => (
+  <div className="flex items-center justify-between p-6 bg-black/40 rounded-3xl border border-slate-800">
+    <div>
+      <p className="font-black text-sm uppercase tracking-tight">{label}</p>
+      <p className="text-slate-500 text-xs">{desc}</p>
+    </div>
+    <div className={`w-14 h-8 rounded-full p-1 transition-all ${active ? 'bg-sky-600' : 'bg-slate-800'}`}>
+      <div className={`w-6 h-6 bg-white rounded-full transition-all ${active ? 'translate-x-6' : 'translate-x-0'}`} />
+    </div>
   </div>
 );
 
