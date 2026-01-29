@@ -1,11 +1,11 @@
-
 {
   "name": "skyflow-bridge",
   "version": "2.1.0",
   "description": "Robust Bridge and UI Server for FSX/P3D Weather",
   "main": "bridge.js",
   "scripts": {
-    "start": "node bridge.js"
+    "start": "node bridge.js",
+    "build": "echo 'Static deployment: No build step required.'"
   },
   "dependencies": {
     "ws": "latest",

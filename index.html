@@ -27,6 +27,7 @@
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
     <script>
+      // Support for environments like AI Studio that inject API keys
       window.process = window.process || { env: {} };
       
       function logToHUD(msg, type = 'INFO') {
@@ -74,6 +75,7 @@
 
     <div id="root"></div>
 
-    <script type="text/babel" data-type="module" data-presets="typescript,react" src="./index.tsx"></script>
+    <!-- Ensure the path works for both Vercel root and AI Studio local serving -->
+    <script type="text/babel" data-type="module" data-presets="typescript,react" src="index.tsx"></script>
 </body>
 </html>
