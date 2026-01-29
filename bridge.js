@@ -1,5 +1,5 @@
 /**
- * SKYFLOW CORE ENGINE v2.10
+ * SKYFLOW CORE ENGINE v2.11
  * Robust Bridge for FSX/P3D with Persistent Logging
  */
 
@@ -25,20 +25,25 @@ function writeLog(message, level = 'INFO') {
 }
 
 // 30-Day Auto-Purge Logic
-if (fs.existsSync(LOG_FILE)) {
-  try {
-    const stats = fs.statSync(LOG_FILE);
-    const now = new Date().getTime();
-    const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
-    if (now - stats.birthtimeMs > thirtyDaysInMs) {
-      fs.writeFileSync(LOG_FILE, `[SYSTEM] Log purged after 30 days of service.\n`);
-      console.log('SKYFLOW: 30-day log rotation executed.');
+function checkLogRotation() {
+  if (fs.existsSync(LOG_FILE)) {
+    try {
+      const stats = fs.statSync(LOG_FILE);
+      const now = new Date().getTime();
+      const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
+      if (now - stats.birthtimeMs > thirtyDaysInMs) {
+        fs.writeFileSync(LOG_FILE, `[SYSTEM] Log automatically rotated after 30 days.\n`);
+        console.log('SKYFLOW: 30-day log rotation executed.');
+      }
+    } catch (e) {
+      writeLog('Log rotation check failed: ' + e.message, 'WARN');
     }
-  } catch (e) {
-    writeLog('Purge check failed: ' + e.message, 'WARN');
+  } else {
+    fs.writeFileSync(LOG_FILE, `[SYSTEM] Log initialized.\n`);
   }
 }
 
+checkLogRotation();
 writeLog('SkyFlow Bridge Initializing...');
 
 // --- SERVER SETUP ---
@@ -51,11 +56,23 @@ app.use((req, res, next) => {
 
 app.use(express.static(__dirname));
 
+// View Logs
 app.get('/api/logs', (req, res) => {
   if (fs.existsSync(LOG_FILE)) {
     res.sendFile(LOG_FILE);
   } else {
     res.status(404).send('Log file not found.');
+  }
+});
+
+// Clear Logs (View and Delete)
+app.delete('/api/logs', (req, res) => {
+  try {
+    fs.writeFileSync(LOG_FILE, `[SYSTEM] Log cleared by user at ${new Date().toISOString()}.\n`);
+    writeLog('Persistent log file wiped by user request.', 'SUCCESS');
+    res.status(200).send('Log cleared.');
+  } catch (err) {
+    res.status(500).send('Failed to clear log: ' + err.message);
   }
 });
 

@@ -34,6 +34,7 @@ const App: React.FC = () => {
       level
     };
     setLogs(prev => [...prev.slice(-12), newLog]);
+    console.log(`[APP] ${message}`);
   };
 
   useEffect(() => {
@@ -47,9 +48,24 @@ const App: React.FC = () => {
       if (res.ok) {
         const text = await res.text();
         setPersistentLogs(text);
+      } else {
+        setPersistentLogs('No logs found on disk.');
       }
     } catch (e) {
       console.log("Persistent logs only available when running bridge.js locally.");
+    }
+  };
+
+  const clearPersistentLogs = async () => {
+    if (!window.confirm("Wipe 'skyflow_avionics.log' from your computer? This cannot be undone.")) return;
+    try {
+      const res = await fetch('/api/logs', { method: 'DELETE' });
+      if (res.ok) {
+        addLog("DISK: Log file wiped.", "SUCCESS");
+        setPersistentLogs("[LOG CLEARED BY USER]");
+      }
+    } catch (e) {
+      addLog("DISK: Failed to clear log file.", "ERROR");
     }
   };
 
@@ -95,9 +111,9 @@ const App: React.FC = () => {
       setCurrentMetar(data);
       if (isBridgeActive && wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: 'INJECT_WEATHER', icao: data.icao, raw: data.raw }));
-        addLog(`SYNC: ${data.icao} injected to simulator`, 'SUCCESS');
+        addLog(`SYNC: ${data.icao} injected to simulator`, "SUCCESS");
       } else {
-        addLog(`PREVIEW: Local data for ${data.icao} loaded.`, 'SUCCESS');
+        addLog(`PREVIEW: Local data for ${data.icao} loaded.`, "SUCCESS");
       }
     } catch (error: any) {
       addLog(`FAULT: ${error.message}`, 'ERROR');
@@ -167,15 +183,21 @@ const App: React.FC = () => {
 
       case NavigationTab.SETTINGS:
         return (
-          <div className="max-w-2xl mx-auto space-y-8">
+          <div className="max-w-2xl mx-auto space-y-8 pb-20">
             <div className="bg-slate-900 p-10 rounded-[40px] border border-slate-800 shadow-2xl space-y-8">
-              <h2 className="text-3xl font-black italic">Persistent Disk Log</h2>
-              <div className="bg-black/80 p-6 rounded-3xl border border-slate-800 font-mono text-[11px] h-96 overflow-y-auto whitespace-pre text-slate-500">
-                {persistentLogs || 'Connect to bridge.js to view persistent file logs.'}
+              <div className="flex justify-between items-center">
+                <h2 className="text-3xl font-black italic">Persistent Disk Log</h2>
+                <div className="flex gap-2">
+                  <button onClick={fetchPersistentLogs} className="bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors">Reload</button>
+                  <button onClick={clearPersistentLogs} className="bg-red-950/40 text-red-500 border border-red-900/50 hover:bg-red-600 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Clear Log File</button>
+                </div>
               </div>
-              <div className="flex justify-between items-center text-[10px] font-bold text-slate-600 uppercase tracking-widest">
-                <span>Auto-Purge: 30 Days</span>
-                <span>Storage: skyflow_avionics.log</span>
+              <div className="bg-black/80 p-6 rounded-3xl border border-slate-800 font-mono text-[11px] h-96 overflow-y-auto whitespace-pre text-slate-400 border-l-4 border-l-sky-500/30">
+                {persistentLogs || 'Log file is empty or unreachable. Ensure bridge.js is running locally.'}
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-[9px] font-bold text-slate-600 uppercase tracking-widest text-center">
+                <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">Auto-Purge Cycle: 30 Days</div>
+                <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">Path: ./skyflow_avionics.log</div>
               </div>
             </div>
           </div>
@@ -225,7 +247,7 @@ const App: React.FC = () => {
             </button>
           ))}
           <div className="mt-auto p-4 border-t border-slate-800/50 text-center opacity-30">
-             <p className="text-[7px] text-slate-400 uppercase font-black tracking-[0.3em]">Build 2.10-FINAL</p>
+             <p className="text-[7px] text-slate-400 uppercase font-black tracking-[0.3em]">Build 2.11-STABLE</p>
           </div>
         </aside>
 
