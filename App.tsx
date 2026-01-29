@@ -27,6 +27,23 @@ const App: React.FC = () => {
     setLogs(prev => [...prev.slice(-8), newLog]);
   };
 
+  // Lifecycle: App Ready
+  useEffect(() => {
+    // Dismiss Splash Screen
+    const splash = document.getElementById('boot-splash');
+    if (splash) {
+      setTimeout(() => splash.classList.add('fade-out'), 500);
+    }
+
+    // Check API Health
+    if (!process.env.API_KEY) {
+      addLog("API CONFIG MISSING: Check secrets.", "ERROR");
+    } else {
+      addLog("SkyFlow Intelligence Online", "SUCCESS");
+    }
+  }, []);
+
+  // Lifecycle: Sim Bridge
   useEffect(() => {
     let reconnectTimer: any;
     const connectBridge = () => {
@@ -75,10 +92,10 @@ const App: React.FC = () => {
         wsRef.current.send(JSON.stringify({ type: 'INJECT_WEATHER', icao: data.icao, raw: data.raw }));
         addLog(`SYNC: ${data.icao} injected to Sim`, 'SUCCESS');
       } else {
-        addLog(`DATA: ${data.icao} fetched (Cloud Preview)`, 'INFO');
+        addLog(`DATA: ${data.icao} fetched (Preview Mode)`, 'INFO');
       }
-    } catch (error) {
-      addLog(`API ERROR: Engine Offline`, 'ERROR');
+    } catch (error: any) {
+      addLog(`API ERROR: ${error.message}`, 'ERROR');
     } finally {
       setLoading(false);
     }
