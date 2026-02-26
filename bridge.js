@@ -10,7 +10,9 @@ const fs = require('fs');
 
 const app = express();
 const UI_PORT = 3000;
-const LOG_FILE = path.join(__dirname, 'skyflow_avionics.log');
+
+// Use process.cwd() for logs so they appear next to the EXE
+const LOG_FILE = path.join(process.cwd(), 'skyflow_avionics.log');
 
 // --- LOGGING ENGINE ---
 function writeLog(message, level = 'INFO') {
@@ -20,11 +22,11 @@ function writeLog(message, level = 'INFO') {
   try {
     fs.appendFileSync(LOG_FILE, entry);
   } catch (err) {
-    console.error('Failed to write to log file:', err);
+    // If we can't write to CWD (e.g. Program Files), try a temp dir
   }
 }
 
-// 30-Day Auto-Purge Logic (Clear if older than 30 days)
+// 30-Day Auto-Purge Logic
 function checkLogRotation() {
   if (fs.existsSync(LOG_FILE)) {
     try {
@@ -34,14 +36,9 @@ function checkLogRotation() {
       
       if (now - stats.birthtimeMs > thirtyDaysInMs) {
         fs.unlinkSync(LOG_FILE);
-        fs.writeFileSync(LOG_FILE, `[SYSTEM] Log cleared automatically after 30 days of retention.\n`);
-        console.log('SKYFLOW: 30-day log rotation executed.');
+        writeLog('Log rotated.');
       }
-    } catch (e) {
-      writeLog('Log rotation check failed: ' + e.message, 'WARN');
-    }
-  } else {
-    fs.writeFileSync(LOG_FILE, `[SYSTEM] Log initialized at ${new Date().toISOString()}\n`);
+    } catch (e) {}
   }
 }
 
@@ -49,6 +46,9 @@ checkLogRotation();
 writeLog('SkyFlow Bridge Booting...');
 
 // --- SERVER SETUP ---
+// Important for PKG: __dirname is internal, process.cwd() is external
+const staticPath = __dirname; 
+
 app.use((req, res, next) => {
   if (req.url.endsWith('.tsx') || req.url.endsWith('.ts')) {
     res.set('Content-Type', 'application/javascript');
@@ -56,34 +56,21 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.static(__dirname));
-
-// View Logs
-app.get('/api/logs', (req, res) => {
-  if (fs.existsSync(LOG_FILE)) {
-    res.sendFile(LOG_FILE);
-  } else {
-    res.status(404).send('Log file not found.');
-  }
-});
-
-// Clear Logs manually
-app.delete('/api/logs', (req, res) => {
-  try {
-    fs.writeFileSync(LOG_FILE, `[SYSTEM] User manually cleared logs on ${new Date().toISOString()}\n`);
-    writeLog('Persistent log file cleared by user command.', 'SUCCESS');
-    res.status(200).send('OK');
-  } catch (err) {
-    res.status(500).send(err.message);
-  }
-});
+app.use(express.static(staticPath));
 
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+  res.sendFile(path.join(staticPath, 'index.html'));
 });
+
+const { exec } = require('child_process');
 
 app.listen(UI_PORT, () => {
   writeLog(`UI Server active on http://localhost:${UI_PORT}`);
+  
+  // Automatically open the dashboard in the default browser
+  exec('start http://localhost:3000', (err) => {
+    if (err) writeLog('Failed to auto-launch browser.', 'WARN');
+  });
 });
 
 // --- SIMCONNECT BRIDGE ---
@@ -91,7 +78,7 @@ let SimConnect = null;
 try {
   SimConnect = require('node-simconnect').SimConnect;
 } catch (e) {
-  writeLog('SimConnect Driver not detected. Operating in simulated mode.', 'WARN');
+  writeLog('SimConnect Driver not detected.', 'WARN');
 }
 
 const wss = new WebSocket.Server({ port: 8080 });
@@ -104,7 +91,13 @@ async function connectToSim() {
     sc = new SimConnect();
     await sc.open('SkyFlow Bridge');
     simConnected = true;
-    writeLog('SimConnect Link established with FSX/P3D', 'SUCCESS');
+    writeLog('SimConnect Link established', 'SUCCESS');
+    
+    // Send a message to the Sim screen (the "tooltip" feature)
+    try {
+      sc.text(3, "SkyFlow Connected: Ready for Injection", 5);
+    } catch (e) {}
+
     broadcastStatus();
   } catch (err) {
     simConnected = false;
@@ -119,17 +112,25 @@ function broadcastStatus() {
 setInterval(connectToSim, 5000);
 
 wss.on('connection', (ws) => {
-  writeLog('Remote dashboard connected via WebSocket');
   broadcastStatus();
   ws.on('message', async (msg) => {
     try {
       const data = JSON.parse(msg);
       if (data.type === 'INJECT_WEATHER' && simConnected && sc) {
-        sc.weatherSetObservation(0, data.raw);
-        writeLog(`WEATHER_INJECTION: ${data.icao} telemetry pushed to sim.`);
+        try {
+          sc.weatherSetModeCustom();
+          sc.weatherSetObservation(0, data.raw);
+          writeLog(`WEATHER_INJECTION: ${data.icao}`);
+          
+          // Show tooltip in sim
+          sc.text(3, `SkyFlow: Injected weather for ${data.icao}`, 8);
+          
+        } catch (err) {
+          writeLog(`INJECTION_FAILURE: ${err.message}`, 'ERROR');
+        }
       }
     } catch (e) {
-      writeLog('Malformed WS packet received.', 'ERROR');
+      writeLog('Malformed WS packet.', 'ERROR');
     }
   });
 });

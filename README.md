@@ -1,28 +1,26 @@
+# ✈️ SkyFlow Professional Weather v3.0
 
-# ✈️ SkyFlow Professional Weather v2.9
+SkyFlow is a high-performance, AI-powered weather injection system for FSX and Prepar3D. Version 3.0 introduces a robust standalone engine that bypasses simulator restrictions and provides real-time atmospheric synchronization.
 
-SkyFlow is an AI-powered weather injection system for FSX and Prepar3D. It uses Gemini AI to generate realistic atmospheric conditions based on global airport telemetry.
+## 🚀 One-Click Quick Start
 
-## 🚀 Easy Start Guide
+1.  **Launch**: Double-click **`Launch.exe`**.
+    *   This starts the engine and automatically opens your dashboard in your web browser.
+2.  **Connect**: Start FSX/P3D. You will see an on-screen message: *"SkyFlow Connected: Ready for Injection"* once the link is active.
+3.  **Inject**: Enter an ICAO (e.g., KLAX) on the dashboard and click **SYNC WEATHER**.
+    *   **Pro Tip**: Injection works even when the simulator is **Paused**.
 
-1. **Visit the Dashboard**: Open the SkyFlow web app in your browser.
-2. **Setup the Bridge**:
-   - Go to the **Setup Guide** tab in the app.
-   - Download `skyflow-bridge.exe`.
-   - **CRITICAL**: Move the `.exe` file into your **Flight Simulator Root Folder**.
-     - *Example Path*: `C:\Program Files (x86)\Microsoft Games\Microsoft Flight Simulator X`
-3. **Ignite**:
-   - Run `skyflow-bridge.exe`.
-   - Start your Flight Simulator.
-   - The status bar at the top of the browser will turn **GREEN** when everything is linked.
-
-## 🛠 Features
-- **AI-METAR**: Real-time generation of weather scenarios.
-- **XGauge Support**: Customizable weather radar integration.
-- **Zero-Config**: Uses the developer's pre-built AI key (no user setup required).
-- **Universal Remote**: Control your PC weather from any device (phone/tablet) on the same network.
+## 🛠 New in v3.0
+- **Standalone Engine**: No Node.js installation required for the end-user.
+- **Smart Injection**: Bypasses the "Pause" state to update weather instantly.
+- **In-Sim Tooltips**: Real-time feedback messages appear directly inside the simulator window during injection.
+- **Legacy Cleanup**: Automatically detects and prevents interference from older "WeatherInjector" tools.
+- **Universal Remote**: Access the dashboard from any device on your local network.
 
 ## ⚠️ Requirements
 - Windows 10/11
-- FSX, FSX:SE, or P3D v1-v5
-- An active internet connection
+- FSX (Steam or Retail) or Prepar3D v1-v5
+- Active Internet Connection (for AI atmospheric modeling)
+
+---
+*Developed for the professional flight simulation community.*

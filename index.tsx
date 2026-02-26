@@ -48,10 +48,11 @@ const FSX_AIRCRAFT = [
 ];
 
 // --- SERVICES ---
-const fetchMetarData = async (icao: string): Promise<MetarData> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+const fetchMetarData = async (icao: string, apiKey: string): Promise<MetarData> => {
+  if (!apiKey) throw new Error("API_KEY_MISSING: Please enter your Gemini API Key in System Settings.");
+  const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-1.5-flash',
     contents: `Generate a hyper-realistic aviation METAR for ${icao}. Include temperature, wind, and complex cloud layers. Return as JSON.`,
     config: {
       responseMimeType: "application/json",
@@ -209,8 +210,15 @@ const App: React.FC = () => {
   const [stationQuery, setStationQuery] = useState('KLAX');
   const [isSimConnected, setIsSimConnected] = useState(false);
   const [isBridgeActive, setIsBridgeActive] = useState(false);
+  const [apiKey, setApiKey] = useState(localStorage.getItem('skyflow_api_key') || '');
   
   const wsRef = useRef<WebSocket | null>(null);
+
+  const saveApiKey = (key: string) => {
+    setApiKey(key);
+    localStorage.setItem('skyflow_api_key', key);
+    addLog("SYSTEM: API Key saved to local storage.", "SUCCESS");
+  };
 
   const addLog = (message: string, level: LogEntry['level'] = 'INFO') => {
     if ((window as any).addLog) (window as any).addLog(message, level);
@@ -255,10 +263,15 @@ const App: React.FC = () => {
 
   const handleInject = async (icao: string = stationQuery) => {
     if (!icao) return;
+    if (!apiKey) {
+      setActiveTab(NavigationTab.SETTINGS);
+      addLog("ERROR: API Key required for weather generation.", "ERROR");
+      return;
+    }
     setLoading(true);
     addLog(`AI: Querying atmospheric model for ${icao}...`, 'INFO');
     try {
-      const data = await fetchMetarData(icao);
+      const data = await fetchMetarData(icao, apiKey);
       setCurrentMetar(data);
       if (isBridgeActive && wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: 'INJECT_WEATHER', icao: data.icao, raw: data.raw }));
@@ -304,54 +317,100 @@ const App: React.FC = () => {
 
         <main className="flex-1 overflow-y-auto p-8">
           <div className="max-w-4xl mx-auto space-y-8">
-            <div className="bg-slate-900/60 p-8 rounded-[32px] border border-slate-800/50 flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl backdrop-blur-md">
-              <div className="text-center md:text-left">
-                <h2 className="text-3xl font-black uppercase tracking-tighter text-white italic leading-tight">Injection Core</h2>
-                <p className="text-slate-500 text-[8px] font-bold tracking-[0.3em] mt-1 uppercase">Direct SimConnect Uplink</p>
-              </div>
-              <div className="flex gap-3 p-2 bg-black/40 rounded-2xl border border-slate-800/50">
-                <input 
-                  type="text" 
-                  maxLength={4} 
-                  value={stationQuery} 
-                  onChange={e => setStationQuery(e.target.value.toUpperCase())} 
-                  className="w-20 bg-transparent p-3 text-2xl font-black text-center text-sky-400 outline-none uppercase italic" 
-                  placeholder="ICAO"
-                />
-                <button 
-                  onClick={() => handleInject()} 
-                  disabled={loading} 
-                  className={`px-6 rounded-xl font-black uppercase tracking-widest text-[9px] transition-all ${loading ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-sky-600 hover:bg-sky-500 text-white shadow-xl shadow-sky-900/40'}`}
-                >
-                  {loading ? 'UPLOADING...' : 'SYNC WEATHER'}
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-              <div className="space-y-4">
-                <label className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-700 ml-4 flex items-center gap-2">
-                   <span className="w-1 h-1 bg-sky-500 rounded-full"></span> Telemetry
-                </label>
-                {currentMetar ? <MetarDisplay data={currentMetar} /> : (
-                  <div className="h-full min-h-[250px] border border-slate-800/50 rounded-[24px] flex flex-col items-center justify-center text-slate-800 p-8 text-center bg-slate-900/10">
-                    <span className="font-black uppercase tracking-[0.2em] text-[8px]">System Standby</span>
+            {activeTab === NavigationTab.DASHBOARD ? (
+              <>
+                <div className="bg-slate-900/60 p-8 rounded-[32px] border border-slate-800/50 flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl backdrop-blur-md">
+                  <div className="text-center md:text-left">
+                    <h2 className="text-3xl font-black uppercase tracking-tighter text-white italic leading-tight">Injection Core</h2>
+                    <p className="text-slate-500 text-[8px] font-bold tracking-[0.3em] mt-1 uppercase">Direct SimConnect Uplink</p>
                   </div>
-                )}
-              </div>
-              <div className="space-y-4">
-                <label className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-700 ml-4 flex items-center gap-2">
-                   <span className="w-1 h-1 bg-green-500 rounded-full"></span> Radar
-                </label>
-                <div className="h-full min-h-[350px]">
-                  {currentMetar ? <RadarView metar={currentMetar} /> : (
-                    <div className="h-full border border-slate-800/50 rounded-[24px] flex flex-col items-center justify-center text-slate-800 p-8 text-center bg-slate-900/10">
-                      <span className="font-black uppercase tracking-[0.2em] text-[8px]">Radar Offline</span>
+                  <div className="flex gap-3 p-2 bg-black/40 rounded-2xl border border-slate-800/50">
+                    <input 
+                      type="text" 
+                      maxLength={4} 
+                      value={stationQuery} 
+                      onChange={e => setStationQuery(e.target.value.toUpperCase())} 
+                      className="w-20 bg-transparent p-3 text-2xl font-black text-center text-sky-400 outline-none uppercase italic" 
+                      placeholder="ICAO"
+                    />
+                    <button 
+                      onClick={() => handleInject()} 
+                      disabled={loading} 
+                      title="Inject AI-generated weather directly into FSX/P3D"
+                      className={`px-6 rounded-xl font-black uppercase tracking-widest text-[9px] transition-all ${loading ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-sky-600 hover:bg-sky-500 text-white shadow-xl shadow-sky-900/40'}`}
+                    >
+                      {loading ? 'UPLOADING...' : 'SYNC WEATHER'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+                  <div className="space-y-4">
+                    <label className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-700 ml-4 flex items-center gap-2">
+                       <span className="w-1 h-1 bg-sky-500 rounded-full"></span> Telemetry
+                    </label>
+                    {currentMetar ? <MetarDisplay data={currentMetar} /> : (
+                      <div className="h-full min-h-[250px] border border-slate-800/50 rounded-[24px] flex flex-col items-center justify-center text-slate-800 p-8 text-center bg-slate-900/10">
+                        <span className="font-black uppercase tracking-[0.2em] text-[8px]">System Standby</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-4">
+                    <label className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-700 ml-4 flex items-center gap-2">
+                       <span className="w-1 h-1 bg-green-500 rounded-full"></span> Radar
+                    </label>
+                    <div className="h-full min-h-[350px]">
+                      {currentMetar ? <RadarView metar={currentMetar} /> : (
+                        <div className="h-full border border-slate-800/50 rounded-[24px] flex flex-col items-center justify-center text-slate-800 p-8 text-center bg-slate-900/10">
+                          <span className="font-black uppercase tracking-[0.2em] text-[8px]">Radar Offline</span>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
+                </div>
+              </>
+            ) : activeTab === NavigationTab.SETTINGS ? (
+              <div className="bg-slate-900/60 p-12 rounded-[32px] border border-slate-800/50 shadow-2xl backdrop-blur-md max-w-2xl mx-auto">
+                <h2 className="text-2xl font-black uppercase tracking-tighter text-white italic mb-2">System Settings</h2>
+                <p className="text-slate-500 text-[10px] font-bold tracking-[0.2em] mb-12 uppercase">Configure Global Parameters</p>
+                
+                <div className="space-y-8">
+                  <div className="space-y-3">
+                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-500">Gemini API Key</label>
+                    <div className="flex gap-4">
+                      <input 
+                        type="password"
+                        value={apiKey}
+                        onChange={(e) => setApiKey(e.target.value)}
+                        placeholder="Enter Gemini API Key..."
+                        className="flex-1 bg-black/40 border border-slate-800 rounded-xl px-4 py-3 text-sky-400 font-mono text-sm focus:border-sky-500 outline-none"
+                      />
+                      <button 
+                        onClick={() => saveApiKey(apiKey)}
+                        className="bg-sky-600 hover:bg-sky-500 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all"
+                      >
+                        SAVE
+                      </button>
+                    </div>
+                    <p className="text-[9px] text-slate-600 leading-relaxed font-bold">
+                      SkyFlow requires a Gemini API Key to model atmospheric telemetry. 
+                      You can get one for free at <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-sky-600 hover:underline">aistudio.google.com</a>.
+                    </p>
+                  </div>
+
+                  <div className="pt-8 border-t border-slate-800/50 flex flex-col gap-2">
+                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">About SkyFlow v3.0</span>
+                    <p className="text-[9px] text-slate-700 leading-relaxed">
+                      Professional AI-powered weather injection core. Built for FSX/P3D using SimConnect. Standalone Node.js architecture.
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full py-20 text-slate-800 opacity-30">
+                <span className="font-black uppercase tracking-[0.3em] text-[10px]">Tab Content Restricted in Alpha Build</span>
+              </div>
+            )}
           </div>
         </main>
       </div>

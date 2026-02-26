@@ -12,5 +12,14 @@
     "node-simconnect": "latest",
     "node-notifier": "latest",
     "express": "latest"
+  },
+  "bin": "bridge.js",
+  "pkg": {
+    "assets": [
+      "index.html",
+      "index.tsx",
+      "constants.tsx",
+      "types.ts"
+    ]
   }
 }
