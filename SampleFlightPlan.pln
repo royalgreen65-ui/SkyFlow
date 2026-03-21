@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SimBase.Document Type="FlightPlan" version="1,0">
+    <Descr>Flight Plan</Descr>
+    <FlightPlan.FlightPlan>
+        <Title>KLAX to KSFO</Title>
+        <FPType>IFR</FPType>
+        <RouteType>Direct</RouteType>
+        <CruisingAlt>35000</CruisingAlt>
+        <DepartureID>KLAX</DepartureID>
+        <DestinationID>KSFO</DestinationID>
+        <ATCWaypoint id="KLAX">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>KLAX</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="KSFO">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>KSFO</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+    </FlightPlan.FlightPlan>
+</SimBase.Document>
